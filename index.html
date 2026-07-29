@@ -301,17 +301,17 @@ const PRICES = {
   bambuTarak: 840,
   kapiSusu: 1600,
   harfMagnet: null, // özel kademeli fiyat sistemi (aşağıda)
-  ciftIsim: 100
+  ciftIsim: 50
 };
 
 // Ekranda gösterilecek ürün listesi (kolayca yeni ürün eklenebilir)
 const PRODUCTS = [
-  { id: 'tavsan',        name: 'Peluş Tavşan',       price: PRICES.tavsan },
-  { id: 'yaka',          name: 'Yaka',                price: PRICES.yaka },
-  { id: 'ciftYaka',      name: 'Çift Yaka',           price: PRICES.ciftYaka },
+  { id: 'tavsan',        name: 'Tavşan Uyku Arkadaşı', price: PRICES.tavsan },
+  { id: 'yaka',          name: 'İsme Özel Boyunluk',    price: PRICES.yaka },
+  { id: 'ciftYaka',      name: 'Çift Kat İsme Özel Boyunluk', price: PRICES.ciftYaka },
   { id: 'kucukSapka',    name: 'Küçük Şapka',         price: null }, // özel blok sistemi
   { id: 'buyukSapka',    name: 'Büyük Şapka',         price: PRICES.buyukSapka },
-  { id: 'teddy',         name: 'Teddy Peluş',         price: PRICES.teddy },
+  { id: 'teddy',         name: 'Teddy Uyku Arkadaşı', price: PRICES.teddy },
   { id: 'keciKiliTarak', name: 'Keçi Kılı Tarak',     price: PRICES.keciKiliTarak },
   { id: 'bambuTarak',    name: 'Bambu Tarak',         price: PRICES.bambuTarak },
   { id: 'kapiSusu',      name: 'Kapı / Duvar Süsü',   price: PRICES.kapiSusu },
@@ -335,10 +335,10 @@ const SETS = [
 // Müşteri mesajında set içeriğini okunabilir isimlerle göstermek için kullanılan eşleme.
 // Sadece görüntüleme amaçlıdır — fiyatlandırmayı etkilemez.
 const CONTENT_DISPLAY_NAMES = {
-  tavsan: 'Peluş Tavşan',
-  teddy: 'Teddy Peluş',
-  yaka: 'Boyunluk',
-  ciftYaka: 'Çift Kat Boyunluk',
+  tavsan: 'Tavşan Uyku Arkadaşı',
+  teddy: 'Teddy Uyku Arkadaşı',
+  yaka: 'İsme Özel Boyunluk',
+  ciftYaka: 'Çift Kat İsme Özel Boyunluk',
   buyukSapka: 'İsimli Bebek Şapkası',
   kucukSapka: 'Oyuncak Şapkası'
 };
@@ -362,7 +362,7 @@ const HAT_BLOCK_TOTAL = HAT_UNIT_PRICES.reduce((a,b)=>a+b,0); // 1250 TL
 const SABIT_MESAJ = {
   kargo: 120,
   hazirlik: '15 iş günü',
-  ciftIsimNotu: 'Çift uzun isimlerde +100 TL eklenmiştir.'
+  ciftIsimNotu: 'Çift uzun isimlerde +50 TL eklenmiştir.'
 };
 
 /* =========================================================
@@ -593,10 +593,10 @@ function renderResult(result){
 
   if (hasIndividual){
     html += `<div class="result-line head">Kullanılan Ürünler</div>`;
-    if (rem.tavsan)     html += `<div class="result-line"><span>${rem.tavsan} × Peluş Tavşan</span><span>${fmt(rem.tavsan * PRICES.tavsan)} TL</span></div>`;
-    if (rem.yaka)       html += `<div class="result-line"><span>${rem.yaka} × Yaka</span><span>${fmt(rem.yaka * PRICES.yaka)} TL</span></div>`;
-    if (rem.ciftYaka)   html += `<div class="result-line"><span>${rem.ciftYaka} × Çift Yaka</span><span>${fmt(rem.ciftYaka * PRICES.ciftYaka)} TL</span></div>`;
-    if (rem.teddy)      html += `<div class="result-line"><span>${rem.teddy} × Teddy Peluş</span><span>${fmt(rem.teddy * PRICES.teddy)} TL</span></div>`;
+    if (rem.tavsan)     html += `<div class="result-line"><span>${rem.tavsan} × Tavşan Uyku Arkadaşı</span><span>${fmt(rem.tavsan * PRICES.tavsan)} TL</span></div>`;
+    if (rem.yaka)       html += `<div class="result-line"><span>${rem.yaka} × İsme Özel Boyunluk</span><span>${fmt(rem.yaka * PRICES.yaka)} TL</span></div>`;
+    if (rem.ciftYaka)   html += `<div class="result-line"><span>${rem.ciftYaka} × Çift Kat İsme Özel Boyunluk</span><span>${fmt(rem.ciftYaka * PRICES.ciftYaka)} TL</span></div>`;
+    if (rem.teddy)      html += `<div class="result-line"><span>${rem.teddy} × Teddy Uyku Arkadaşı</span><span>${fmt(rem.teddy * PRICES.teddy)} TL</span></div>`;
     if (rem.buyukSapka) html += `<div class="result-line"><span>${rem.buyukSapka} × Büyük Şapka</span><span>${fmt(rem.buyukSapka * PRICES.buyukSapka)} TL</span></div>`;
 
     if (rem.kucukSapka){
@@ -638,13 +638,13 @@ function buildMessage(result){
   const { anaSetSonuc, tarakSonuc, ciftIsimCost, kargoDahilToplam } = result;
   const lines = [];
 
-  // Bir setin/otomatik setin içeriğini "  - 2 Ürün Adı" biçiminde, aralarında boş satırlarla ekler.
+  // Bir setin/otomatik setin içeriğini "   • 2 Ürün Adı" biçiminde, aralarında boş satırlarla ekler.
   // Sadece görüntü amaçlıdır; fiyatlandırmayı etkilemez.
   function pushContentLines(order, displayNames, requires, count){
     lines.push('');
     order.forEach(key => {
       const qty = (requires[key] || 0) * count;
-      if (qty > 0) lines.push(`  - ${qty} ${displayNames[key]}`);
+      if (qty > 0) lines.push(`   • ${qty} ${displayNames[key]}`);
     });
     lines.push('');
   }
@@ -670,10 +670,26 @@ function buildMessage(result){
     pushContentLines(TARAK_SET_CONTENT_ORDER, TARAK_CONTENT_DISPLAY_NAMES, TARAK_SET.requires, tarakSonuc.setSayisi);
   }
 
-  if (rem.tavsan)     lines.push(`• ${rem.tavsan} × Peluş Tavşan — ${fmt(rem.tavsan * PRICES.tavsan)} TL`);
-  if (rem.yaka)       lines.push(`• ${rem.yaka} × Yaka — ${fmt(rem.yaka * PRICES.yaka)} TL`);
-  if (rem.ciftYaka)   lines.push(`• ${rem.ciftYaka} × Çift Yaka — ${fmt(rem.ciftYaka * PRICES.ciftYaka)} TL`);
-  if (rem.teddy)      lines.push(`• ${rem.teddy} × Teddy Peluş — ${fmt(rem.teddy * PRICES.teddy)} TL`);
+  // Uyku Arkadaşı + Boyunluk birleştirme (Güncelleme 15-16): yalnızca mesaj görünümü içindir,
+  // set fiyatlarını veya hesaplama motorunu etkilemez. Eşleşen adet kadar tek satırda,
+  // kalan (eşleşmeyen) adet ayrı satırda gösterilir.
+  function mergeAndPush(countA, nameA, priceA, countB, nameB, priceB){
+    const merged = Math.min(countA, countB);
+    const extraA = countA - merged;
+    const extraB = countB - merged;
+    if (merged > 0) lines.push(`• ${merged} × ${nameA} + ${nameB} — ${fmt(merged * (priceA + priceB))} TL`);
+    if (extraA > 0) lines.push(`• ${extraA} × ${nameA} — ${fmt(extraA * priceA)} TL`);
+    if (extraB > 0) lines.push(`• ${extraB} × ${nameB} — ${fmt(extraB * priceB)} TL`);
+  }
+
+  const TAVSAN_ADI = 'Tavşan Uyku Arkadaşı';
+  const YAKA_ADI = 'İsme Özel Boyunluk';
+  const TEDDY_ADI = 'Teddy Uyku Arkadaşı';
+  const CIFT_YAKA_ADI = 'Çift Kat İsme Özel Boyunluk';
+
+  mergeAndPush(rem.tavsan || 0, TAVSAN_ADI, PRICES.tavsan, rem.yaka || 0, YAKA_ADI, PRICES.yaka);
+  mergeAndPush(rem.teddy || 0, TEDDY_ADI, PRICES.teddy, rem.ciftYaka || 0, CIFT_YAKA_ADI, PRICES.ciftYaka);
+
   if (rem.buyukSapka) lines.push(`• ${rem.buyukSapka} × Büyük Şapka — ${fmt(rem.buyukSapka * PRICES.buyukSapka)} TL`);
   if (rem.kucukSapka) lines.push(`• ${rem.kucukSapka} × Küçük Şapka — ${fmt(hatBlockCost(rem.kucukSapka))} TL`);
   if (tarakSonuc.kalanKeci)  lines.push(`• ${tarakSonuc.kalanKeci} × Keçi Kılı Tarak + Kese — ${fmt(tarakSonuc.kalanKeci * PRICES.keciKiliTarak)} TL`);
