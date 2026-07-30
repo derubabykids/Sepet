@@ -198,6 +198,85 @@
   }
   .quick-btn:active{background:rgba(201,107,125,0.2);}
 
+  /* ---- Yurtdışı toggle ---- */
+  .locale-card{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .locale-card .locale-label{
+    font-size:15px;
+    font-weight:700;
+  }
+  .switch{
+    position:relative;width:50px;height:29px;
+    background:var(--line);border-radius:20px;
+    cursor:pointer;flex-shrink:0;
+    transition:background .15s;
+  }
+  .switch.on{background:var(--rose);}
+  .switch .knob{
+    position:absolute;top:3px;left:3px;
+    width:23px;height:23px;border-radius:50%;
+    background:#fff;
+    transition:left .15s;
+    box-shadow:0 1px 2px rgba(0,0,0,0.2);
+  }
+  .switch.on .knob{left:24px;}
+
+  /* ---- İndirim / Ek Hizmet form alanları ---- */
+  .field-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .field-row:last-child{margin-bottom:0;}
+  .field-input{
+    flex:1;
+    border:1px solid var(--line);
+    background:var(--blush);
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:13.5px;
+    color:var(--ink);
+    font-family:inherit;
+    min-width:0;
+  }
+  .field-input.amount{flex:0 0 110px;}
+  .field-input:focus{outline:2px solid var(--rose);outline-offset:-1px;}
+
+  .extra-row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .extra-row .field-input{margin-bottom:0;}
+  .extra-remove{
+    flex-shrink:0;
+    width:36px;height:36px;
+    border:none;
+    border-radius:10px;
+    background:var(--blush);
+    color:var(--rose-deep);
+    font-size:16px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .extra-add-btn{
+    width:100%;
+    border:1px dashed var(--rose);
+    background:transparent;
+    color:var(--rose-deep);
+    border-radius:10px;
+    padding:10px;
+    font-size:13.5px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:2px;
+  }
+
   .toast{
     position:fixed;
     left:50%;bottom:24px;
@@ -227,49 +306,68 @@
 
   <header>
     <h1>DERU</h1>
-    <div class="sub">Fiyat Optimizasyon Motoru</div>
+    <div class="sub" id="txtSubtitle">Fiyat Optimizasyon Motoru</div>
   </header>
 
+  <div class="card locale-card no-print">
+    <div class="locale-label" id="txtLocaleLabel">🌍 Yurtdışı Müşterisi</div>
+    <div class="switch" id="swLocale"><div class="knob"></div></div>
+  </div>
+
   <div class="total-card">
-    <div class="label">Toplam Tutar</div>
+    <div class="label" id="txtTotalLabel">Toplam Tutar</div>
     <div class="amount" id="totalAmount">0 <span>TL</span></div>
   </div>
 
   <div class="card no-print">
-    <div class="quick-card-title">🐰 Tavşan Setleri</div>
+    <div class="quick-card-title" id="txtQuickCard1">🐰 Tavşan Setleri</div>
     <div class="quick-btn-row">
-      <button class="quick-btn" id="qsYasSeti">➕ Yaş Seti</button>
-      <button class="quick-btn" id="qsAylikSet">➕ Aylık Set</button>
+      <button class="quick-btn" id="qsYasSeti">➕ Yaş / 6 Aylık Set</button>
+      <button class="quick-btn" id="qsAylikSet">➕ 12 Aylık Set</button>
     </div>
   </div>
 
   <div class="card no-print">
-    <div class="quick-card-title">🧸 Teddy Setleri</div>
+    <div class="quick-card-title" id="txtQuickCard2">🧸 Teddy Setleri</div>
     <div class="quick-btn-row">
-      <button class="quick-btn" id="qsTeddyYasSeti">➕ Teddy Yaş Seti</button>
-      <button class="quick-btn" id="qsTeddyAylikSet">➕ Teddy Aylık Set</button>
+      <button class="quick-btn" id="qsTeddyYasSeti">➕ Teddy Yaş / 6 Aylık Set</button>
+      <button class="quick-btn" id="qsTeddyAylikSet">➕ Teddy 12 Aylık Set</button>
     </div>
   </div>
 
   <div class="card no-print">
-    <div class="quick-card-title">🪮 Tarak Setleri</div>
+    <div class="quick-card-title" id="txtQuickCard3">🪮 Tarak Setleri</div>
     <div class="quick-btn-row">
       <button class="quick-btn" id="qsTarakSeti">➕ Tarak Seti</button>
     </div>
   </div>
 
   <div class="card no-print">
-    <h2 class="section-title">Ürünler</h2>
+    <h2 class="section-title" id="txtUrunlerTitle">Ürünler</h2>
     <div id="productList"></div>
   </div>
 
+  <div class="card no-print">
+    <h2 class="section-title" id="txtIndirimTitle">🏷️ İndirim</h2>
+    <div class="field-row">
+      <input type="text" class="field-input" id="discountDesc" placeholder="Açıklama (örn. Kampanya)">
+      <input type="number" class="field-input amount" id="discountAmount" placeholder="TL" min="0">
+    </div>
+  </div>
+
+  <div class="card no-print">
+    <h2 class="section-title" id="txtEkHizmetTitle">➕ Ek Hizmet / Ek Ücret</h2>
+    <div id="extraServiceList"></div>
+    <button class="extra-add-btn" id="btnAddExtra">+ Ekle</button>
+  </div>
+
   <div class="card">
-    <h2 class="section-title">Fiyat Dökümü</h2>
+    <h2 class="section-title" id="txtFiyatDokumuTitle">Fiyat Dökümü</h2>
     <div id="resultBox"></div>
   </div>
 
   <div class="card">
-    <h2 class="section-title">Müşteri Mesajı</h2>
+    <h2 class="section-title" id="txtMusteriMesajiTitle">Müşteri Mesajı</h2>
     <div class="msg-box" id="msgBox"></div>
     <div class="btn-row no-print">
       <button class="btn btn-primary" id="btnCopy">Kopyala</button>
@@ -306,31 +404,35 @@ const PRICES = {
 
 // Ekranda gösterilecek ürün listesi (kolayca yeni ürün eklenebilir)
 const PRODUCTS = [
-  { id: 'tavsan',        name: 'Tavşan Uyku Arkadaşı', price: PRICES.tavsan },
-  { id: 'yaka',          name: 'İsme Özel Boyunluk',    price: PRICES.yaka },
-  { id: 'ciftYaka',      name: 'Çift Kat İsme Özel Boyunluk', price: PRICES.ciftYaka },
-  { id: 'kucukSapka',    name: 'Küçük Şapka',         price: null }, // özel blok sistemi
-  { id: 'buyukSapka',    name: 'Büyük Şapka',         price: PRICES.buyukSapka },
-  { id: 'teddy',         name: 'Teddy Uyku Arkadaşı', price: PRICES.teddy },
-  { id: 'keciKiliTarak', name: 'Keçi Kılı Tarak',     price: PRICES.keciKiliTarak },
-  { id: 'bambuTarak',    name: 'Bambu Tarak',         price: PRICES.bambuTarak },
-  { id: 'kapiSusu',      name: 'Kapı / Duvar Süsü',   price: PRICES.kapiSusu },
-  { id: 'harfMagnet',    name: 'Harf Magnet',         price: null }, // özel kademeli fiyat sistemi
-  { id: 'ciftIsim',      name: 'Çift İsim',           price: PRICES.ciftIsim }
+  { id: 'tavsan',        name: 'Tavşan Uyku Arkadaşı', nameEN: 'Bunny Sleep Buddy',                 price: PRICES.tavsan },
+  { id: 'yaka',          name: 'İsme Özel Boyunluk',    nameEN: 'Personalized Neck Scarf',           price: PRICES.yaka },
+  { id: 'ciftYaka',      name: 'Çift Kat İsme Özel Boyunluk', nameEN: 'Double-Layer Personalized Neck Scarf', price: PRICES.ciftYaka },
+  { id: 'kucukSapka',    name: 'Küçük Şapka',          nameEN: 'Toy Hat',                           price: null }, // özel blok sistemi
+  { id: 'buyukSapka',    name: 'Büyük Şapka',          nameEN: 'Personalized Baby Hat',             price: PRICES.buyukSapka },
+  { id: 'teddy',         name: 'Teddy Uyku Arkadaşı',  nameEN: 'Teddy Sleep Buddy',                 price: PRICES.teddy },
+  { id: 'keciKiliTarak', name: 'Keçi Kılı Tarak',      nameEN: 'Goat Hair Brush',                   price: PRICES.keciKiliTarak },
+  { id: 'bambuTarak',    name: 'Bambu Tarak',          nameEN: 'Bamboo Brush',                      price: PRICES.bambuTarak },
+  { id: 'kapiSusu',      name: 'Kapı / Duvar Süsü',    nameEN: 'Door / Wall Decor',                 price: PRICES.kapiSusu },
+  { id: 'harfMagnet',    name: 'Harf Magnet',          nameEN: 'Letter Magnets',                    price: null }, // özel kademeli fiyat sistemi
+  { id: 'ciftIsim',      name: 'Çift İsim',            nameEN: 'Long Double Name',                  price: PRICES.ciftIsim }
 ];
 
 // Ana setler — her biri "requires" içinde hangi üründen kaç adet tükettiğini tanımlar.
 // Yeni bir set eklemek için bu diziye bir obje eklemek yeterlidir.
 const SETS = [
-  { id: 'yasSeti',        name: 'Yaş / 6 Aylık Set',       price: 1300, requires: { tavsan: 1, yaka: 1, kucukSapka: 1, buyukSapka: 1 },
+  { id: 'yasSeti',        name: 'Yaş / 6 Aylık Set',       nameEN: 'Bunny 1st Birthday / 6-Month Set', price: 1300, requires: { tavsan: 1, yaka: 1, kucukSapka: 1, buyukSapka: 1 },
     contentOrder: ['tavsan','buyukSapka','kucukSapka','yaka'] },
-  { id: 'aylikSet',       name: '12 Aylık Set',            price: 2400, requires: { tavsan: 1, yaka: 1, buyukSapka: 1, kucukSapka: 12 },
+  { id: 'aylikSet',       name: '12 Aylık Set',            nameEN: 'Bunny 12-Month Keepsake Set',      price: 2400, requires: { tavsan: 1, yaka: 1, buyukSapka: 1, kucukSapka: 12 },
     contentOrder: ['tavsan','buyukSapka','kucukSapka','yaka'] },
-  { id: 'teddyYasSeti',   name: 'Teddy Yaş / 6 Aylık Set', price: 1600, requires: { teddy: 1, ciftYaka: 1, kucukSapka: 1, buyukSapka: 1 },
+  { id: 'teddyYasSeti',   name: 'Teddy Yaş / 6 Aylık Set', nameEN: 'Teddy 1st Birthday / 6-Month Set', price: 1600, requires: { teddy: 1, ciftYaka: 1, kucukSapka: 1, buyukSapka: 1 },
     contentOrder: ['teddy','buyukSapka','kucukSapka','ciftYaka'] },
-  { id: 'teddyAylikSet',  name: 'Teddy 12 Aylık Set',      price: 2700, requires: { teddy: 1, ciftYaka: 1, buyukSapka: 1, kucukSapka: 12 },
+  { id: 'teddyAylikSet',  name: 'Teddy 12 Aylık Set',      nameEN: 'Teddy 12-Month Keepsake Set',      price: 2700, requires: { teddy: 1, ciftYaka: 1, buyukSapka: 1, kucukSapka: 12 },
     contentOrder: ['teddy','buyukSapka','kucukSapka','ciftYaka'] }
 ];
+
+// Müşteri mesajında setlerin gösterim önceliği (Güncelleme 20). Yalnızca görüntü sırasını belirler;
+// fiyat optimizasyon motorunu veya hangi kombinasyonun seçildiğini etkilemez.
+const MESSAGE_SET_DISPLAY_ORDER = ['teddyAylikSet', 'aylikSet', 'teddyYasSeti', 'yasSeti'];
 
 // Müşteri mesajında set içeriğini okunabilir isimlerle göstermek için kullanılan eşleme.
 // Sadece görüntüleme amaçlıdır — fiyatlandırmayı etkilemez.
@@ -342,6 +444,14 @@ const CONTENT_DISPLAY_NAMES = {
   buyukSapka: 'İsimli Bebek Şapkası',
   kucukSapka: 'Oyuncak Şapkası'
 };
+const CONTENT_DISPLAY_NAMES_EN = {
+  tavsan: 'Bunny Sleep Buddy',
+  teddy: 'Teddy Sleep Buddy',
+  yaka: 'Personalized Neck Scarf',
+  ciftYaka: 'Double-Layer Personalized Neck Scarf',
+  buyukSapka: 'Personalized Baby Hat',
+  kucukSapka: 'Toy Hat'
+};
 
 // Tarak Seti için de aynı içerik gösterimi (otomatik oluşturulan setler dahil)
 const TARAK_SET_CONTENT_ORDER = ['keciKiliTarak', 'bambuTarak'];
@@ -349,9 +459,13 @@ const TARAK_CONTENT_DISPLAY_NAMES = {
   keciKiliTarak: 'Keçi Kılı Tarak',
   bambuTarak: 'Bambu Tarak'
 };
+const TARAK_CONTENT_DISPLAY_NAMES_EN = {
+  keciKiliTarak: 'Goat Hair Brush',
+  bambuTarak: 'Bamboo Brush'
+};
 
 // Tarak otomatik seti (kullanıcı bunu seçmez, sistem kendisi oluşturur)
-const TARAK_SET = { name: "2'li Tarak Seti", price: 1400, requires: { keciKiliTarak: 1, bambuTarak: 1 } };
+const TARAK_SET = { name: "2'li Tarak Seti", nameEN: 'Brush Set', price: 1400, requires: { keciKiliTarak: 1, bambuTarak: 1 } };
 
 // Küçük Şapka blok içi birim fiyatlar (1..12. şapka sırasıyla)
 // 1-6: 150 TL sabit / 7-11: 60 TL sabit / 12: 50 TL
@@ -371,6 +485,130 @@ const SABIT_MESAJ = {
 
 let state = {};
 PRODUCTS.forEach(p => state[p.id] = 0);
+state.discountDesc = '';
+state.discountAmount = 0;
+state.extraServices = []; // [{ desc, price }]
+
+let locale = 'tr'; // 'tr' | 'intl'
+
+/* =========================================================
+   1b. ULUSLARARASI (i18n) METİNLER
+   ========================================================= */
+
+const I18N = {
+  tr: {
+    subtitle: 'Fiyat Optimizasyon Motoru',
+    localeLabel: '🌍 Yurtdışı Müşterisi',
+    totalLabel: 'Toplam Tutar',
+    quickCard1: '🐰 Tavşan Setleri',
+    quickCard2: '🧸 Teddy Setleri',
+    quickCard3: '🪮 Tarak Setleri',
+    quickBtnYasSeti: '➕ Yaş / 6 Aylık Set',
+    quickBtnAylikSet: '➕ 12 Aylık Set',
+    quickBtnTeddyYasSeti: '➕ Teddy Yaş / 6 Aylık Set',
+    quickBtnTeddyAylikSet: '➕ Teddy 12 Aylık Set',
+    quickBtnTarakSeti: '➕ Tarak Seti',
+    urunlerTitle: 'Ürünler',
+    indirimTitle: '🏷️ İndirim',
+    discountDescPlaceholder: 'Açıklama (örn. Kampanya)',
+    discountAmountPlaceholder: 'TL',
+    ekHizmetTitle: '➕ Ek Hizmet / Ek Ücret',
+    extraDescPlaceholder: 'Açıklama (örn. Nakış)',
+    extraPricePlaceholder: 'TL',
+    extraAddBtn: '+ Ekle',
+    fiyatDokumuTitle: 'Fiyat Dökümü',
+    musteriMesajiTitle: 'Müşteri Mesajı',
+    btnCopy: 'Kopyala',
+    btnPrint: 'Yazdır',
+    btnClear: 'Siparişi Temizle',
+    emptyMsg: 'Henüz ürün seçilmedi',
+    resultHeadSets: 'Kullanılan Setler',
+    resultHeadAutoSets: 'Oluşturulan Otomatik Setler',
+    resultHeadProducts: 'Kullanılan Ürünler',
+    resultHeadDiscount: 'İndirim',
+    resultHeadExtra: 'Ek Hizmet / Ek Ücret',
+    subtotalLabel: 'Ara toplam',
+    roundingLabel: 'Yuvarlama',
+    totalLine: 'TOPLAM',
+    currency: 'TL',
+    toastCopied: 'Kopyalandı',
+    toastCopyFail: 'Kopyalama başarısız'
+  },
+  intl: {
+    subtitle: 'Price Optimization Engine',
+    localeLabel: '🌍 International Customer',
+    totalLabel: 'Total Amount',
+    quickCard1: '🐰 Bunny Sets',
+    quickCard2: '🧸 Teddy Sets',
+    quickCard3: '🪮 Brush Sets',
+    quickBtnYasSeti: '➕ Bunny 1st Birthday / 6-Month Set',
+    quickBtnAylikSet: '➕ Bunny 12-Month Keepsake Set',
+    quickBtnTeddyYasSeti: '➕ Teddy 1st Birthday / 6-Month Set',
+    quickBtnTeddyAylikSet: '➕ Teddy 12-Month Keepsake Set',
+    quickBtnTarakSeti: '➕ Brush Set',
+    urunlerTitle: 'Products',
+    indirimTitle: '🏷️ Discount',
+    discountDescPlaceholder: 'Description (e.g. Promotion)',
+    discountAmountPlaceholder: 'TRY',
+    ekHizmetTitle: '➕ Additional Service',
+    extraDescPlaceholder: 'Description (e.g. Embroidery)',
+    extraPricePlaceholder: 'TRY',
+    extraAddBtn: '+ Add',
+    fiyatDokumuTitle: 'Price Breakdown',
+    musteriMesajiTitle: 'Customer Message',
+    btnCopy: 'Copy',
+    btnPrint: 'Print',
+    btnClear: 'Clear Order',
+    emptyMsg: 'No products selected yet',
+    resultHeadSets: 'Sets Used',
+    resultHeadAutoSets: 'Auto-Generated Sets',
+    resultHeadProducts: 'Products Used',
+    resultHeadDiscount: 'Discount',
+    resultHeadExtra: 'Additional Service',
+    subtotalLabel: 'Subtotal',
+    roundingLabel: 'Rounding',
+    totalLine: 'TOTAL',
+    currency: 'TRY',
+    toastCopied: 'Copied',
+    toastCopyFail: 'Copy failed'
+  }
+};
+
+function tr(key){ return I18N[locale][key]; }
+
+/* =========================================================
+   1c. YURTDIŞI FİYAT ÇEVRİMİ (Güncelleme 25)
+   ========================================================= */
+
+// Türkiye fiyatını yurtdışı fiyatına çevirir: (fiyat / 0.70), en yakın üst 20 TL katına yuvarlanır.
+// Yalnızca GÖRÜNTÜLEME amaçlıdır — iç hesaplama TL üzerinden değişmeden devam eder.
+function convertToIntl(tl){
+  return Math.ceil((tl / 0.70) / 20) * 20;
+}
+
+// Her yerde fiyat göstermek için tek nokta: locale'e göre TL veya TRY döndürür.
+function money(tl){
+  const value = locale === 'intl' ? convertToIntl(tl) : tl;
+  return `${fmt(value)} ${tr('currency')}`;
+}
+
+// Ürün/Set isimlerini locale'e göre döndürür (yalnızca görüntü; requires/price anahtarları değişmez).
+function pname(id){
+  const p = PRODUCTS.find(x => x.id === id);
+  return locale === 'intl' ? p.nameEN : p.name;
+}
+function sname(idx){
+  return locale === 'intl' ? SETS[idx].nameEN : SETS[idx].name;
+}
+function contentNames(){
+  return locale === 'intl' ? CONTENT_DISPLAY_NAMES_EN : CONTENT_DISPLAY_NAMES;
+}
+function tarakContentNames(){
+  return locale === 'intl' ? TARAK_CONTENT_DISPLAY_NAMES_EN : TARAK_CONTENT_DISPLAY_NAMES;
+}
+function tarakSetName(){
+  return locale === 'intl' ? TARAK_SET.nameEN : TARAK_SET.name;
+}
 
 /* =========================================================
    3. KÜÇÜK ŞAPKA BLOK HESAPLAMA SİSTEMİ
@@ -492,9 +730,21 @@ function optimizeAll(s){
   const harfMagnetTotal = harfMagnetCost(s.harfMagnet || 0);
   const ciftIsimCost = (s.ciftIsim || 0) * PRICES.ciftIsim;
 
-  const araToplam = anaSetSonuc.cost + tarakSonuc.cost + kapiSusuCost + harfMagnetTotal + ciftIsimCost;
+  // Ek Hizmet / Ek Ücret (Güncelleme 23): kullanıcının serbestçe eklediği kalemlerin toplamı.
+  const extraServices = (s.extraServices || []).filter(x => x.desc && Number(x.price) > 0);
+  const extraServicesTotal = extraServices.reduce((sum, x) => sum + Number(x.price), 0);
+
+  const rawTotal = anaSetSonuc.cost + tarakSonuc.cost + kapiSusuCost + harfMagnetTotal + ciftIsimCost + extraServicesTotal;
+
+  // İndirim (Güncelleme 22): toplamdan düşülür, negatif toplam oluşmasına izin verilmez.
+  const requestedDiscount = Math.max(0, Number(s.discountAmount) || 0);
+  const appliedDiscount = Math.min(requestedDiscount, rawTotal);
+  const discountDesc = (s.discountDesc || '').trim();
+  const hasDiscount = appliedDiscount > 0 && discountDesc.length > 0;
+
+  const araToplam = rawTotal - (hasDiscount ? appliedDiscount : 0);
   const finalToplam = Math.round(araToplam / 10) * 10; // yuvarlama sadece en sonda
-  const kargoDahilToplam = finalToplam + SABIT_MESAJ.kargo; // sadece müşteri mesajında kullanılır
+  const kargoDahilToplam = finalToplam + SABIT_MESAJ.kargo; // sadece TR müşteri mesajında kullanılır
 
   return {
     anaSetSonuc,
@@ -502,6 +752,12 @@ function optimizeAll(s){
     kapiSusuCost,
     harfMagnetCost: harfMagnetTotal,
     ciftIsimCost,
+    extraServices,
+    extraServicesTotal,
+    hasDiscount,
+    discountDesc,
+    appliedDiscount: hasDiscount ? appliedDiscount : 0,
+    rawTotal,
     araToplam,
     finalToplam,
     kargoDahilToplam
@@ -514,12 +770,18 @@ function optimizeAll(s){
 
 function fmt(n){ return n.toLocaleString('tr-TR'); }
 
-function setName(idx){ return SETS[idx].name; }
-
 function priceLabel(p){
-  if (p.id === 'kucukSapka') return 'blok sistemi (1-6: 150 TL, 7-11: 60 TL, 12: 50 TL)';
-  if (p.id === 'harfMagnet') return 'ilk 6 harf 100 TL, sonrası 70 TL';
-  return fmt(p.price) + ' TL';
+  if (p.id === 'kucukSapka'){
+    return locale === 'intl'
+      ? `tiered pricing (1-6: ${money(150)}, 7-11: ${money(60)}, 12: ${money(50)})`
+      : 'blok sistemi (1-6: 150 TL, 7-11: 60 TL, 12: 50 TL)';
+  }
+  if (p.id === 'harfMagnet'){
+    return locale === 'intl'
+      ? `first 6 letters ${money(100)} each, then ${money(70)} each`
+      : 'ilk 6 harf 100 TL, sonrası 70 TL';
+  }
+  return money(p.price);
 }
 
 /* =========================================================
@@ -534,7 +796,7 @@ function renderProducts(){
     row.className = 'product-row';
     row.innerHTML = `
       <div class="info">
-        <div class="name">${p.name}</div>
+        <div class="name">${pname(p.id)}</div>
         <div class="price">${priceLabel(p)}</div>
       </div>
       <div class="stepper">
@@ -561,10 +823,12 @@ function renderProducts(){
 
 function renderResult(result){
   const box = document.getElementById('resultBox');
-  const { anaSetSonuc, tarakSonuc, kapiSusuCost, harfMagnetCost, ciftIsimCost, araToplam, finalToplam } = result;
+  const { anaSetSonuc, tarakSonuc, kapiSusuCost, harfMagnetCost, ciftIsimCost,
+          extraServices, extraServicesTotal, hasDiscount, discountDesc, appliedDiscount,
+          araToplam, finalToplam } = result;
 
   const usedSets = anaSetSonuc.counts
-    .map((c, i) => ({ c, name: SETS[i].name, price: SETS[i].price }))
+    .map((c, i) => ({ c, name: sname(i), price: SETS[i].price }))
     .filter(x => x.c > 0);
 
   const rem = anaSetSonuc.remaining;
@@ -574,58 +838,75 @@ function renderResult(result){
 
   let html = '';
 
-  if (usedSets.length === 0 && tarakSonuc.setSayisi === 0 && !hasIndividual){
-    box.innerHTML = '<div class="empty-msg">Henüz ürün seçilmedi</div>';
+  if (usedSets.length === 0 && tarakSonuc.setSayisi === 0 && !hasIndividual && extraServices.length === 0 && !hasDiscount){
+    box.innerHTML = `<div class="empty-msg">${tr('emptyMsg')}</div>`;
     return;
   }
 
   if (usedSets.length){
-    html += `<div class="result-line head">Kullanılan Setler</div>`;
+    html += `<div class="result-line head">${tr('resultHeadSets')}</div>`;
     usedSets.forEach(x => {
-      html += `<div class="result-line"><span>${x.c} × ${x.name}</span><span>${fmt(x.c * x.price)} TL</span></div>`;
+      html += `<div class="result-line"><span>${x.c} × ${x.name}</span><span>${money(x.c * x.price)}</span></div>`;
     });
   }
 
   if (tarakSonuc.setSayisi > 0){
-    html += `<div class="result-line head">Oluşturulan Otomatik Setler</div>`;
-    html += `<div class="result-line"><span>${tarakSonuc.setSayisi} × ${TARAK_SET.name}</span><span>${fmt(tarakSonuc.setSayisi * TARAK_SET.price)} TL</span></div>`;
+    html += `<div class="result-line head">${tr('resultHeadAutoSets')}</div>`;
+    html += `<div class="result-line"><span>${tarakSonuc.setSayisi} × ${tarakSetName()}</span><span>${money(tarakSonuc.setSayisi * TARAK_SET.price)}</span></div>`;
   }
 
   if (hasIndividual){
-    html += `<div class="result-line head">Kullanılan Ürünler</div>`;
-    if (rem.tavsan)     html += `<div class="result-line"><span>${rem.tavsan} × Tavşan Uyku Arkadaşı</span><span>${fmt(rem.tavsan * PRICES.tavsan)} TL</span></div>`;
-    if (rem.yaka)       html += `<div class="result-line"><span>${rem.yaka} × İsme Özel Boyunluk</span><span>${fmt(rem.yaka * PRICES.yaka)} TL</span></div>`;
-    if (rem.ciftYaka)   html += `<div class="result-line"><span>${rem.ciftYaka} × Çift Kat İsme Özel Boyunluk</span><span>${fmt(rem.ciftYaka * PRICES.ciftYaka)} TL</span></div>`;
-    if (rem.teddy)      html += `<div class="result-line"><span>${rem.teddy} × Teddy Uyku Arkadaşı</span><span>${fmt(rem.teddy * PRICES.teddy)} TL</span></div>`;
-    if (rem.buyukSapka) html += `<div class="result-line"><span>${rem.buyukSapka} × Büyük Şapka</span><span>${fmt(rem.buyukSapka * PRICES.buyukSapka)} TL</span></div>`;
+    html += `<div class="result-line head">${tr('resultHeadProducts')}</div>`;
+    if (rem.tavsan)     html += `<div class="result-line"><span>${rem.tavsan} × ${pname('tavsan')}</span><span>${money(rem.tavsan * PRICES.tavsan)}</span></div>`;
+    if (rem.yaka)       html += `<div class="result-line"><span>${rem.yaka} × ${pname('yaka')}</span><span>${money(rem.yaka * PRICES.yaka)}</span></div>`;
+    if (rem.ciftYaka)   html += `<div class="result-line"><span>${rem.ciftYaka} × ${pname('ciftYaka')}</span><span>${money(rem.ciftYaka * PRICES.ciftYaka)}</span></div>`;
+    if (rem.teddy)      html += `<div class="result-line"><span>${rem.teddy} × ${pname('teddy')}</span><span>${money(rem.teddy * PRICES.teddy)}</span></div>`;
+    if (rem.buyukSapka) html += `<div class="result-line"><span>${rem.buyukSapka} × ${pname('buyukSapka')}</span><span>${money(rem.buyukSapka * PRICES.buyukSapka)}</span></div>`;
 
     if (rem.kucukSapka){
       const full = Math.floor(rem.kucukSapka / HAT_BLOCK_SIZE);
       const partial = rem.kucukSapka % HAT_BLOCK_SIZE;
-      html += `<div class="result-line"><span>${rem.kucukSapka} × Küçük Şapka</span><span>${fmt(hatBlockCost(rem.kucukSapka))} TL</span></div>`;
-      if (full)    html += `<div class="result-line sub"><span>${full} tam blok (12'li)</span><span>${fmt(full * HAT_BLOCK_TOTAL)} TL</span></div>`;
-      if (partial) html += `<div class="result-line sub"><span>${partial} adet (yeni blok)</span><span>${fmt(partialHatBlockCost(partial))} TL</span></div>`;
+      html += `<div class="result-line"><span>${rem.kucukSapka} × ${pname('kucukSapka')}</span><span>${money(hatBlockCost(rem.kucukSapka))}</span></div>`;
+      if (full)    html += `<div class="result-line sub"><span>${full} × 12</span><span>${money(full * HAT_BLOCK_TOTAL)}</span></div>`;
+      if (partial) html += `<div class="result-line sub"><span>${partial}</span><span>${money(partialHatBlockCost(partial))}</span></div>`;
     }
 
-    if (tarakSonuc.kalanKeci)  html += `<div class="result-line"><span>${tarakSonuc.kalanKeci} × Keçi Kılı Tarak</span><span>${fmt(tarakSonuc.kalanKeci * PRICES.keciKiliTarak)} TL</span></div>`;
-    if (tarakSonuc.kalanBambu) html += `<div class="result-line"><span>${tarakSonuc.kalanBambu} × Bambu Tarak</span><span>${fmt(tarakSonuc.kalanBambu * PRICES.bambuTarak)} TL</span></div>`;
-    if (state.kapiSusu)        html += `<div class="result-line"><span>${state.kapiSusu} × Kapı / Duvar Süsü</span><span>${fmt(kapiSusuCost)} TL</span></div>`;
+    if (tarakSonuc.kalanKeci)  html += `<div class="result-line"><span>${tarakSonuc.kalanKeci} × ${pname('keciKiliTarak')}</span><span>${money(tarakSonuc.kalanKeci * PRICES.keciKiliTarak)}</span></div>`;
+    if (tarakSonuc.kalanBambu) html += `<div class="result-line"><span>${tarakSonuc.kalanBambu} × ${pname('bambuTarak')}</span><span>${money(tarakSonuc.kalanBambu * PRICES.bambuTarak)}</span></div>`;
+    if (state.kapiSusu)        html += `<div class="result-line"><span>${state.kapiSusu} × ${pname('kapiSusu')}</span><span>${money(kapiSusuCost)}</span></div>`;
 
     if (state.harfMagnet){
       const hb = harfMagnetBreakdown(state.harfMagnet);
-      html += `<div class="result-line"><span>${state.harfMagnet} × Harf Magnet</span><span>${fmt(harfMagnetCost)} TL</span></div>`;
-      if (hb.first) html += `<div class="result-line sub"><span>${hb.first} adet (ilk 6, 100 TL)</span><span>${fmt(hb.firstCost)} TL</span></div>`;
-      if (hb.extra) html += `<div class="result-line sub"><span>${hb.extra} adet (7. harften itibaren, 70 TL)</span><span>${fmt(hb.extraCost)} TL</span></div>`;
+      html += `<div class="result-line"><span>${state.harfMagnet} × ${pname('harfMagnet')}</span><span>${money(harfMagnetCost)}</span></div>`;
+      if (hb.first) html += `<div class="result-line sub"><span>${hb.first}</span><span>${money(hb.firstCost)}</span></div>`;
+      if (hb.extra) html += `<div class="result-line sub"><span>${hb.extra}</span><span>${money(hb.extraCost)}</span></div>`;
     }
 
-    if (state.ciftIsim) html += `<div class="result-line"><span>${state.ciftIsim} × Çift İsim</span><span>${fmt(ciftIsimCost)} TL</span></div>`;
+    if (state.ciftIsim) html += `<div class="result-line"><span>${state.ciftIsim} × ${pname('ciftIsim')}</span><span>${money(ciftIsimCost)}</span></div>`;
+  }
+
+  if (extraServices.length){
+    html += `<div class="result-line head">${tr('resultHeadExtra')}</div>`;
+    extraServices.forEach(x => {
+      html += `<div class="result-line"><span>${x.desc}</span><span>${money(Number(x.price))}</span></div>`;
+    });
+  }
+
+  if (hasDiscount){
+    html += `<div class="result-line head">${tr('resultHeadDiscount')}</div>`;
+    html += `<div class="result-line"><span>${discountDesc}</span><span>-${money(appliedDiscount)}</span></div>`;
   }
 
   html += `<div class="dashed"></div>`;
-  html += `<div class="result-line sub"><span>Ara toplam</span><span>${fmt(araToplam)} TL</span></div>`;
-  const diff = finalToplam - araToplam;
-  if (diff !== 0) html += `<div class="result-line sub"><span>Yuvarlama</span><span>${diff > 0 ? '+' : ''}${fmt(diff)} TL</span></div>`;
-  html += `<div class="grand"><span>TOPLAM</span><span>${fmt(finalToplam)} TL</span></div>`;
+  html += `<div class="result-line sub"><span>${tr('subtotalLabel')}</span><span>${money(araToplam)}</span></div>`;
+
+  // Yuvarlama farkı: iki dönüştürülmüş değerin farkı olarak gösterilir (küçük TL farkının
+  // dönüşüm formülüyle orantısız büyümesini önlemek için).
+  const araDisp = locale === 'intl' ? convertToIntl(araToplam) : araToplam;
+  const finalDisp = locale === 'intl' ? convertToIntl(finalToplam) : finalToplam;
+  const diff = finalDisp - araDisp;
+  if (diff !== 0) html += `<div class="result-line sub"><span>${tr('roundingLabel')}</span><span>${diff > 0 ? '+' : ''}${fmt(diff)} ${tr('currency')}</span></div>`;
+  html += `<div class="grand"><span>${tr('totalLine')}</span><span>${money(finalToplam)}</span></div>`;
 
   box.innerHTML = html;
 }
@@ -634,12 +915,17 @@ function renderResult(result){
    10. MÜŞTERİ MESAJI OLUŞTURMA
    ========================================================= */
 
-function buildMessage(result){
-  const { anaSetSonuc, tarakSonuc, ciftIsimCost, kargoDahilToplam } = result;
+// Sete ait içerik satırlarını, tarak birleşimini, Uyku Arkadaşı+Boyunluk birleşimini,
+// ek hizmetleri ve indirimi içeren ürün satırlarını üretir. TR ve EN mesajları bu ortak
+// listeyi kullanır — yalnızca isimler/para birimi locale'e göre değişir, sıra ve mantık aynıdır.
+function buildProductLines(result){
+  const { anaSetSonuc, tarakSonuc, ciftIsimCost, extraServices, hasDiscount, discountDesc, appliedDiscount } = result;
   const lines = [];
+  const cNames = contentNames();
+  const tNames = tarakContentNames();
+  const pouchWord = locale === 'intl' ? 'Pouch' : 'Kese';
 
   // Bir setin/otomatik setin içeriğini "   • 2 Ürün Adı" biçiminde, aralarında boş satırlarla ekler.
-  // Sadece görüntü amaçlıdır; fiyatlandırmayı etkilemez.
   function pushContentLines(order, displayNames, requires, count){
     lines.push('');
     order.forEach(key => {
@@ -649,25 +935,21 @@ function buildMessage(result){
     lines.push('');
   }
 
-  const usedSets = anaSetSonuc.counts
-    .map((c, i) => ({ c, name: SETS[i].name, price: SETS[i].price, requires: SETS[i].requires, contentOrder: SETS[i].contentOrder }))
-    .filter(x => x.c > 0);
-
-  const rem = anaSetSonuc.remaining;
-
-  lines.push('🌸 Siparişiniz');
-  lines.push('');
-
-  usedSets.forEach(x => {
-    lines.push(`• ${x.c} × ${x.name} — ${fmt(x.c * x.price)} TL`);
-    pushContentLines(x.contentOrder, CONTENT_DISPLAY_NAMES, x.requires, x.c);
+  // Güncelleme 20: setler her zaman en yüksek fiyatlıdan en düşüğe doğru gösterilir.
+  // Bu yalnızca gösterim sırasıdır; hangi kombinasyonun seçildiğini optimizeAnaSetler belirler.
+  MESSAGE_SET_DISPLAY_ORDER.forEach(id => {
+    const i = SETS.findIndex(s => s.id === id);
+    const c = anaSetSonuc.counts[i];
+    if (c > 0){
+      lines.push(`• ${c} × ${sname(i)} — ${money(c * SETS[i].price)}`);
+      pushContentLines(SETS[i].contentOrder, cNames, SETS[i].requires, c);
+    }
   });
 
-  // Tarak Seti: Kese ürünle birlikte ücretsiz gelir, mesajda ürün adının parçası olarak tek satırda gösterilir.
-  // Otomatik oluşturulan bu sette de aynı içerik gösterimi uygulanır.
+  // Tarak Seti: Kese/Pouch ürünle birlikte ücretsiz gelir, ürün adının parçası olarak tek satırda gösterilir.
   if (tarakSonuc.setSayisi > 0){
-    lines.push(`• ${tarakSonuc.setSayisi} × ${TARAK_SET.name} + Kese — ${fmt(tarakSonuc.setSayisi * TARAK_SET.price)} TL`);
-    pushContentLines(TARAK_SET_CONTENT_ORDER, TARAK_CONTENT_DISPLAY_NAMES, TARAK_SET.requires, tarakSonuc.setSayisi);
+    lines.push(`• ${tarakSonuc.setSayisi} × ${tarakSetName()} + ${pouchWord} — ${money(tarakSonuc.setSayisi * TARAK_SET.price)}`);
+    pushContentLines(TARAK_SET_CONTENT_ORDER, tNames, TARAK_SET.requires, tarakSonuc.setSayisi);
   }
 
   // Uyku Arkadaşı + Boyunluk birleştirme (Güncelleme 15-16): yalnızca mesaj görünümü içindir,
@@ -677,44 +959,85 @@ function buildMessage(result){
     const merged = Math.min(countA, countB);
     const extraA = countA - merged;
     const extraB = countB - merged;
-    if (merged > 0) lines.push(`• ${merged} × ${nameA} + ${nameB} — ${fmt(merged * (priceA + priceB))} TL`);
-    if (extraA > 0) lines.push(`• ${extraA} × ${nameA} — ${fmt(extraA * priceA)} TL`);
-    if (extraB > 0) lines.push(`• ${extraB} × ${nameB} — ${fmt(extraB * priceB)} TL`);
+    if (merged > 0) lines.push(`• ${merged} × ${nameA} + ${nameB} — ${money(merged * (priceA + priceB))}`);
+    if (extraA > 0) lines.push(`• ${extraA} × ${nameA} — ${money(extraA * priceA)}`);
+    if (extraB > 0) lines.push(`• ${extraB} × ${nameB} — ${money(extraB * priceB)}`);
   }
 
-  const TAVSAN_ADI = 'Tavşan Uyku Arkadaşı';
-  const YAKA_ADI = 'İsme Özel Boyunluk';
-  const TEDDY_ADI = 'Teddy Uyku Arkadaşı';
-  const CIFT_YAKA_ADI = 'Çift Kat İsme Özel Boyunluk';
+  const rem = anaSetSonuc.remaining;
+  mergeAndPush(rem.tavsan || 0, pname('tavsan'), PRICES.tavsan, rem.yaka || 0, pname('yaka'), PRICES.yaka);
+  mergeAndPush(rem.teddy || 0, pname('teddy'), PRICES.teddy, rem.ciftYaka || 0, pname('ciftYaka'), PRICES.ciftYaka);
 
-  mergeAndPush(rem.tavsan || 0, TAVSAN_ADI, PRICES.tavsan, rem.yaka || 0, YAKA_ADI, PRICES.yaka);
-  mergeAndPush(rem.teddy || 0, TEDDY_ADI, PRICES.teddy, rem.ciftYaka || 0, CIFT_YAKA_ADI, PRICES.ciftYaka);
+  if (rem.buyukSapka) lines.push(`• ${rem.buyukSapka} × ${pname('buyukSapka')} — ${money(rem.buyukSapka * PRICES.buyukSapka)}`);
+  if (rem.kucukSapka) lines.push(`• ${rem.kucukSapka} × ${pname('kucukSapka')} — ${money(hatBlockCost(rem.kucukSapka))}`);
+  if (tarakSonuc.kalanKeci)  lines.push(`• ${tarakSonuc.kalanKeci} × ${pname('keciKiliTarak')} + ${pouchWord} — ${money(tarakSonuc.kalanKeci * PRICES.keciKiliTarak)}`);
+  if (tarakSonuc.kalanBambu) lines.push(`• ${tarakSonuc.kalanBambu} × ${pname('bambuTarak')} + ${pouchWord} — ${money(tarakSonuc.kalanBambu * PRICES.bambuTarak)}`);
+  if (state.kapiSusu)   lines.push(`• ${state.kapiSusu} × ${pname('kapiSusu')} — ${money(state.kapiSusu * PRICES.kapiSusu)}`);
+  if (state.harfMagnet) lines.push(`• ${state.harfMagnet} × ${pname('harfMagnet')} — ${money(harfMagnetCost(state.harfMagnet))}`);
+  if (state.ciftIsim)   lines.push(`• ${state.ciftIsim} × ${pname('ciftIsim')} — ${money(ciftIsimCost)}`);
 
-  if (rem.buyukSapka) lines.push(`• ${rem.buyukSapka} × Büyük Şapka — ${fmt(rem.buyukSapka * PRICES.buyukSapka)} TL`);
-  if (rem.kucukSapka) lines.push(`• ${rem.kucukSapka} × Küçük Şapka — ${fmt(hatBlockCost(rem.kucukSapka))} TL`);
-  if (tarakSonuc.kalanKeci)  lines.push(`• ${tarakSonuc.kalanKeci} × Keçi Kılı Tarak + Kese — ${fmt(tarakSonuc.kalanKeci * PRICES.keciKiliTarak)} TL`);
-  if (tarakSonuc.kalanBambu) lines.push(`• ${tarakSonuc.kalanBambu} × Bambu Tarak + Kese — ${fmt(tarakSonuc.kalanBambu * PRICES.bambuTarak)} TL`);
-  if (state.kapiSusu)   lines.push(`• ${state.kapiSusu} × Kapı / Duvar Süsü — ${fmt(state.kapiSusu * PRICES.kapiSusu)} TL`);
-  if (state.harfMagnet) lines.push(`• ${state.harfMagnet} × Harf Magnet — ${fmt(harfMagnetCost(state.harfMagnet))} TL`);
-  if (state.ciftIsim)   lines.push(`• ${state.ciftIsim} × Çift İsim — ${fmt(ciftIsimCost)} TL`);
+  // Ek Hizmet / Ek Ücret (Güncelleme 23): ürünler arasında, kullanıcının girdiği açıklama ile.
+  extraServices.forEach(x => {
+    lines.push(`• ${x.desc} — ${money(Number(x.price))}`);
+  });
 
-  lines.push('');
-  lines.push('━━━━━━━━━━━━━━');
-  lines.push('');
-  lines.push(`📦 Kargo: ${fmt(SABIT_MESAJ.kargo)} TL`);
-  lines.push('');
-  lines.push(`💰 Kargo Dahil Toplam Tutar: ${fmt(kargoDahilToplam)} TL`);
-  lines.push('');
-  lines.push(`⏳ Hazırlık Süresi: ${SABIT_MESAJ.hazirlik}`);
+  // İndirim (Güncelleme 22): "İndirim (Açıklama) — -XXX TL" biçiminde, negatif işaretle.
+  if (hasDiscount){
+    lines.push(`• ${tr('resultHeadDiscount')} (${discountDesc}) — -${money(appliedDiscount)}`);
+  }
 
-  // Şartlı bilgi satırı: sepette en az 1 Çift İsim ürünü varsa gösterilir.
-  if (state.ciftIsim > 0){
+  return lines;
+}
+
+function buildMessage(result){
+  const { kargoDahilToplam, finalToplam } = result;
+  const productLines = buildProductLines(result);
+  const lines = [];
+
+  if (locale === 'tr'){
+    lines.push('🌸 Siparişiniz');
     lines.push('');
-    lines.push(`🩷 ${SABIT_MESAJ.ciftIsimNotu}`);
-  }
+    lines.push(...productLines);
+    lines.push('');
+    lines.push('━━━━━━━━━━━━━━');
+    lines.push('');
+    lines.push(`📦 Kargo: ${money(SABIT_MESAJ.kargo)}`);
+    lines.push('');
+    lines.push(`💰 Kargo Dahil Toplam Tutar: ${money(kargoDahilToplam)}`);
+    lines.push('');
+    lines.push(`⏳ Hazırlık Süresi: ${SABIT_MESAJ.hazirlik}`);
 
-  lines.push('');
-  lines.push('Teşekkür ederiz. 🤍');
+    // Şartlı bilgi satırı: sepette en az 1 Çift İsim ürünü varsa gösterilir.
+    if (state.ciftIsim > 0){
+      lines.push('');
+      lines.push(`🩷 ${SABIT_MESAJ.ciftIsimNotu}`);
+    }
+
+    lines.push('');
+    lines.push('Teşekkür ederiz. 🤍');
+  } else {
+    // Yurtdışı mesajı (Güncelleme 27): kargo tutarı gösterilmez (ülkeye göre değişir),
+    // "Kargo Dahil Toplam Tutar" yerine yalnızca "Products Total" (kargosuz) kullanılır.
+    lines.push('Hello! 🩷');
+    lines.push('');
+    lines.push('Thank you for your order.');
+    lines.push('');
+    lines.push(...productLines);
+    lines.push('');
+    lines.push('━━━━━━━━━━━━━━');
+    lines.push('');
+    lines.push('📦 Shipping: Calculated separately');
+    lines.push('');
+    lines.push(`💰 Products Total: ${money(finalToplam)}`);
+    lines.push('');
+    lines.push('⏳ Production Time: Up to 15 business days (usually faster)');
+    lines.push('');
+    lines.push('📦 Shipping cost depends on destination country, shipping option and package size.');
+    lines.push('Standard box size:');
+    lines.push('40 × 30 × 15 cm');
+    lines.push('');
+    lines.push('Thank you. 🤍');
+  }
 
   // Art arda gelen boş satırları (örn. bir set içeriğinin hemen ardından ayraç geldiğinde) tek satıra indirger.
   const collapsed = lines.filter((l, i) => !(l === '' && lines[i - 1] === ''));
@@ -741,7 +1064,9 @@ function showToast(text){
 
 function recalc(){
   const result = optimizeAll(state);
-  document.getElementById('totalAmount').innerHTML = `${fmt(result.finalToplam)} <span>TL</span>`;
+  document.getElementById('totalAmount').innerHTML = money(result.finalToplam).replace(
+    new RegExp(`${tr('currency')}$`), `<span>${tr('currency')}</span>`
+  );
   renderResult(result);
   document.getElementById('msgBox').textContent = buildMessage(result);
 }
@@ -760,13 +1085,13 @@ document.getElementById('btnCopy').addEventListener('click', () => {
     document.body.appendChild(ta);
     ta.focus();
     ta.select();
-    try { document.execCommand('copy'); showToast('Kopyalandı'); }
-    catch (e) { showToast('Kopyalama başarısız'); }
+    try { document.execCommand('copy'); showToast(tr('toastCopied')); }
+    catch (e) { showToast(tr('toastCopyFail')); }
     document.body.removeChild(ta);
   };
 
   if (navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(() => showToast('Kopyalandı')).catch(fallbackCopy);
+    navigator.clipboard.writeText(text).then(() => showToast(tr('toastCopied'))).catch(fallbackCopy);
   } else {
     fallbackCopy();
   }
@@ -800,14 +1125,117 @@ document.getElementById('qsTarakSeti').addEventListener('click', () => addQuickS
 
 document.getElementById('btnClear').addEventListener('click', () => {
   PRODUCTS.forEach(p => state[p.id] = 0);
+  state.discountDesc = '';
+  state.discountAmount = 0;
+  state.extraServices = [];
+  document.getElementById('discountDesc').value = '';
+  document.getElementById('discountAmount').value = '';
+  renderProducts();
+  renderExtraServices();
+  recalc();
+});
+
+/* =========================================================
+   14. İNDİRİM ALANI (Güncelleme 22)
+   ========================================================= */
+
+document.getElementById('discountDesc').addEventListener('input', (e) => {
+  state.discountDesc = e.target.value;
+  recalc();
+});
+document.getElementById('discountAmount').addEventListener('input', (e) => {
+  state.discountAmount = e.target.value;
+  recalc();
+});
+
+/* =========================================================
+   15. EK HİZMET / EK ÜCRET ALANI (Güncelleme 23)
+   ========================================================= */
+
+function escAttr(str){
+  return String(str == null ? '' : str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function renderExtraServices(){
+  const list = document.getElementById('extraServiceList');
+  list.innerHTML = '';
+  state.extraServices.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'extra-row';
+    row.innerHTML = `
+      <input type="text" class="field-input" data-idx="${idx}" data-field="desc" placeholder="${tr('extraDescPlaceholder')}" value="${escAttr(item.desc)}">
+      <input type="number" class="field-input amount" data-idx="${idx}" data-field="price" placeholder="${tr('extraPricePlaceholder')}" min="0" value="${escAttr(item.price)}">
+      <button class="extra-remove" data-idx="${idx}" aria-label="sil">×</button>
+    `;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const idx = parseInt(inp.dataset.idx, 10);
+      state.extraServices[idx][inp.dataset.field] = inp.value;
+      recalc();
+    });
+  });
+  list.querySelectorAll('.extra-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      state.extraServices.splice(idx, 1);
+      renderExtraServices();
+      recalc();
+    });
+  });
+}
+
+document.getElementById('btnAddExtra').addEventListener('click', () => {
+  state.extraServices.push({ desc: '', price: '' });
+  renderExtraServices();
+});
+
+/* =========================================================
+   16. YURTDIŞI MODU TOGGLE (Güncelleme 24-27)
+   ========================================================= */
+
+// Tüm sabit arayüz metinlerini aktif locale'e göre günceller (buton isimleri dahil).
+function applyStaticTexts(){
+  document.getElementById('txtSubtitle').textContent = tr('subtitle');
+  document.getElementById('txtLocaleLabel').textContent = tr('localeLabel');
+  document.getElementById('txtTotalLabel').textContent = tr('totalLabel');
+  document.getElementById('txtQuickCard1').textContent = tr('quickCard1');
+  document.getElementById('txtQuickCard2').textContent = tr('quickCard2');
+  document.getElementById('txtQuickCard3').textContent = tr('quickCard3');
+  document.getElementById('qsYasSeti').textContent = tr('quickBtnYasSeti');
+  document.getElementById('qsAylikSet').textContent = tr('quickBtnAylikSet');
+  document.getElementById('qsTeddyYasSeti').textContent = tr('quickBtnTeddyYasSeti');
+  document.getElementById('qsTeddyAylikSet').textContent = tr('quickBtnTeddyAylikSet');
+  document.getElementById('qsTarakSeti').textContent = tr('quickBtnTarakSeti');
+  document.getElementById('txtUrunlerTitle').textContent = tr('urunlerTitle');
+  document.getElementById('txtIndirimTitle').textContent = tr('indirimTitle');
+  document.getElementById('discountDesc').placeholder = tr('discountDescPlaceholder');
+  document.getElementById('discountAmount').placeholder = tr('discountAmountPlaceholder');
+  document.getElementById('txtEkHizmetTitle').textContent = tr('ekHizmetTitle');
+  document.getElementById('btnAddExtra').textContent = tr('extraAddBtn');
+  document.getElementById('txtFiyatDokumuTitle').textContent = tr('fiyatDokumuTitle');
+  document.getElementById('txtMusteriMesajiTitle').textContent = tr('musteriMesajiTitle');
+  document.getElementById('btnCopy').textContent = tr('btnCopy');
+  document.getElementById('btnPrint').textContent = tr('btnPrint');
+  document.getElementById('btnClear').textContent = tr('btnClear');
+  renderExtraServices();
+}
+
+document.getElementById('swLocale').addEventListener('click', function(){
+  locale = locale === 'tr' ? 'intl' : 'tr';
+  this.classList.toggle('on', locale === 'intl');
+  document.documentElement.lang = locale === 'intl' ? 'en' : 'tr';
+  applyStaticTexts();
   renderProducts();
   recalc();
 });
 
 /* =========================================================
-   14. BAŞLANGIÇ
+   17. BAŞLANGIÇ
    ========================================================= */
 
+applyStaticTexts();
 renderProducts();
 recalc();
 </script>
