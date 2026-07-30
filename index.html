@@ -314,6 +314,11 @@
     <div class="switch" id="swLocale"><div class="knob"></div></div>
   </div>
 
+  <div class="card locale-card no-print" id="vatCard" style="display:none;">
+    <div class="locale-label" id="txtVatLabel">Include VAT (15%)</div>
+    <div class="switch" id="swVat"><div class="knob"></div></div>
+  </div>
+
   <div class="total-card">
     <div class="label" id="txtTotalLabel">Toplam Tutar</div>
     <div class="amount" id="totalAmount">0 <span>TL</span></div>
@@ -361,6 +366,13 @@
     <button class="extra-add-btn" id="btnAddExtra">+ Ekle</button>
   </div>
 
+  <div class="card no-print" id="shippingCard" style="display:none;">
+    <h2 class="section-title" id="txtShippingTitle">📦 Shipping</h2>
+    <div class="field-row">
+      <input type="number" class="field-input" id="intlShippingCost" placeholder="Biliyorsanız kargo tutarını yazın (boş = Calculated Separately)" min="0">
+    </div>
+  </div>
+
   <div class="card">
     <h2 class="section-title" id="txtFiyatDokumuTitle">Fiyat Dökümü</h2>
     <div id="resultBox"></div>
@@ -399,7 +411,7 @@ const PRICES = {
   bambuTarak: 840,
   kapiSusu: 1600,
   harfMagnet: null, // özel kademeli fiyat sistemi (aşağıda)
-  ciftIsim: 50
+  ciftIsim: 100
 };
 
 // Ekranda gösterilecek ürün listesi (kolayca yeni ürün eklenebilir)
@@ -488,8 +500,10 @@ PRODUCTS.forEach(p => state[p.id] = 0);
 state.discountDesc = '';
 state.discountAmount = 0;
 state.extraServices = []; // [{ desc, price }]
+state.intlShipping = ''; // yalnızca yurtdışı modunda kullanılır (Kargo/Shipping tutarı, opsiyonel)
 
 let locale = 'tr'; // 'tr' | 'intl'
+let vatEnabled = false; // yalnızca locale === 'intl' iken anlamlıdır (Güncelleme 29, 35)
 
 /* =========================================================
    1b. ULUSLARARASI (i18n) METİNLER
@@ -532,7 +546,12 @@ const I18N = {
     totalLine: 'TOPLAM',
     currency: 'TL',
     toastCopied: 'Kopyalandı',
-    toastCopyFail: 'Kopyalama başarısız'
+    toastCopyFail: 'Kopyalama başarısız',
+    vatLabel: 'KDV Dahil Et (%15)',
+    vatLine: 'KDV (%15)',
+    shippingTitle: '📦 Shipping',
+    shippingPlaceholder: 'Biliyorsanız kargo tutarını yazın (boş = Calculated Separately)',
+    resultHeadShipping: 'Shipping'
   },
   intl: {
     subtitle: 'Price Optimization Engine',
@@ -570,7 +589,12 @@ const I18N = {
     totalLine: 'TOTAL',
     currency: 'TRY',
     toastCopied: 'Copied',
-    toastCopyFail: 'Copy failed'
+    toastCopyFail: 'Copy failed',
+    vatLabel: 'Include VAT (15%)',
+    vatLine: 'VAT (15%)',
+    shippingTitle: '📦 Shipping',
+    shippingPlaceholder: 'Enter shipping cost if known (leave empty = Calculated Separately)',
+    resultHeadShipping: 'Shipping'
   }
 };
 
@@ -586,9 +610,30 @@ function convertToIntl(tl){
   return Math.ceil((tl / 0.70) / 20) * 20;
 }
 
+// Bir TL tutarını, aktif locale'e göre GÖRÜNTÜLENECEK sayısal değere çevirir.
+// TR: değeri aynen döndürür. INTL: (tl/0.70) hesaplayıp en yakın üst 20'ye yuvarlar.
+// KRİTİK (Güncelleme 28): her satır bu fonksiyonla TEK SEFERDE, bağımsız olarak yuvarlanır.
+// Toplamlar bu yuvarlanmış değerlerin TOPLAMI olmalı — asla önce TL toplanıp sonra bir kez
+// çevrilmemelidir (bu, eski hatalı davranıştı).
+function displayAmount(tl){
+  return locale === 'intl' ? convertToIntl(tl) : tl;
+}
+
 // Her yerde fiyat göstermek için tek nokta: locale'e göre TL veya TRY döndürür.
 function money(tl){
-  const value = locale === 'intl' ? convertToIntl(tl) : tl;
+  return `${fmt(displayAmount(tl))} ${tr('currency')}`;
+}
+
+// İndirim ve Ek Hizmet tutarları için: yurtdışı modunda dahi 0.70'e bölme / 20'ye yuvarlama
+// UYGULANMAZ. Kullanıcının girdiği rakam olduğu gibi (yalnızca para birimi etiketiyle) gösterilir.
+function rawMoney(amount){
+  return `${fmt(amount)} ${tr('currency')}`;
+}
+
+// Zaten dönüştürülmüş (TL değil, ekran para birimi cinsinden) bir sayıyı biçimlendirir.
+// Subtotal/VAT/Total gibi "satırların toplamı" olan değerler için kullanılır — bunlar
+// tekrar displayAmount()'tan GEÇİRİLMEMELİDİR, aksi halde çifte yuvarlama hatası oluşur.
+function fmtDisplay(value){
   return `${fmt(value)} ${tr('currency')}`;
 }
 
@@ -631,18 +676,18 @@ function hatBlockCost(n){
   return (fullBlocks * HAT_BLOCK_TOTAL) + partialHatBlockCost(remainder);
 }
 
-// İlk 6 harfin HER BİRİ 100 TL, 7. harften itibaren HER BİRİ 70 TL.
-// Not: Küçük Şapka'nın aksine bu sistemde blok/sıfırlama yoktur — kademe tek seferde uygulanır.
+// İlk 5 harfin HER BİRİ 100 TL, 6. harften itibaren HER BİRİ 70 TL.
+// Bu TL tabanlı formül hem Türkiye hem Yurtdışı fiyatlarının temelidir (Yurtdışı çevrimi bunun üzerine uygulanır).
 function harfMagnetCost(n){
   if (n <= 0) return 0;
-  if (n <= 6) return n * 100;
-  return (6 * 100) + ((n - 6) * 70);
+  if (n <= 5) return n * 100;
+  return (5 * 100) + ((n - 5) * 70);
 }
 
 // Ekranda gösterim için: kaç harf ilk kademede (100 TL), kaç harf ikinci kademede (70 TL)
 function harfMagnetBreakdown(n){
-  const first = Math.min(n, 6);
-  const extra = Math.max(n - 6, 0);
+  const first = Math.min(n, 5);
+  const extra = Math.max(n - 5, 0);
   return { first, extra, firstCost: first * 100, extraCost: extra * 70 };
 }
 
@@ -765,6 +810,72 @@ function optimizeAll(s){
 }
 
 /* =========================================================
+   6b. YURTDIŞI TOPLAMI — SATIR BAZLI DOĞRU HESAPLAMA (Güncelleme 28)
+   ========================================================= */
+
+// KRİTİK: Yurtdışı modunda toplam, HER satırın kendi başına (TL/0.70, en yakın üst 20'ye
+// yuvarlanarak) dönüştürülmüş halinin TOPLAMI olmalıdır — asla önce TL toplanıp sonra
+// tek seferde çevrilmemelidir. Bu fonksiyon, ekranda/mesajda gösterilen HER satırla birebir
+// aynı TL tutarlarını kullanır (ekranda görünen fiyatların toplamı ile matematiksel olarak
+// birebir eşleşmesi garanti edilsin diye) ve her birini AYRI AYRI displayAmount() ile çevirip
+// toplar. Bu sayede Price Breakdown, Customer Message ve Copy Message hep aynı sonucu verir.
+function computeIntlSubtotal(result){
+  const { anaSetSonuc, tarakSonuc, ciftIsimCost, extraServices, hasDiscount, appliedDiscount } = result;
+  const rem = anaSetSonuc.remaining;
+  let sum = 0;
+
+  // Ana setler (her biri kendi TL tutarıyla ayrı ayrı çevrilir)
+  SETS.forEach((set, i) => {
+    const c = anaSetSonuc.counts[i];
+    if (c > 0) sum += displayAmount(c * set.price);
+  });
+
+  // Otomatik oluşturulan Tarak Seti
+  if (tarakSonuc.setSayisi > 0) sum += displayAmount(tarakSonuc.setSayisi * TARAK_SET.price);
+
+  // Uyku Arkadaşı + Boyunluk birleştirme: ekranda TEK satır olarak göründüğü için
+  // birleşik TL tutarı TEK SEFERDE çevrilir (gösterilen fiyatla birebir eşleşmesi için).
+  function mergedAmount(countA, priceA, countB, priceB){
+    const merged = Math.min(countA, countB);
+    const extraA = countA - merged;
+    const extraB = countB - merged;
+    let s = 0;
+    if (merged > 0) s += displayAmount(merged * (priceA + priceB));
+    if (extraA > 0) s += displayAmount(extraA * priceA);
+    if (extraB > 0) s += displayAmount(extraB * priceB);
+    return s;
+  }
+  sum += mergedAmount(rem.tavsan || 0, PRICES.tavsan, rem.yaka || 0, PRICES.yaka);
+  sum += mergedAmount(rem.teddy || 0, PRICES.teddy, rem.ciftYaka || 0, PRICES.ciftYaka);
+
+  if (rem.buyukSapka) sum += displayAmount(rem.buyukSapka * PRICES.buyukSapka);
+  if (rem.kucukSapka) sum += displayAmount(hatBlockCost(rem.kucukSapka));
+  if (tarakSonuc.kalanKeci)  sum += displayAmount(tarakSonuc.kalanKeci * PRICES.keciKiliTarak);
+  if (tarakSonuc.kalanBambu) sum += displayAmount(tarakSonuc.kalanBambu * PRICES.bambuTarak);
+  if (state.kapiSusu)   sum += displayAmount(state.kapiSusu * PRICES.kapiSusu);
+  if (state.harfMagnet) sum += displayAmount(harfMagnetCost(state.harfMagnet));
+  if (state.ciftIsim)   sum += displayAmount(ciftIsimCost);
+
+  // Ek Hizmet / Ek Ücret: kullanıcının yazdığı rakam yurtdışında da dönüştürülmez, aynen kullanılır.
+  extraServices.forEach(x => { sum += Number(x.price); });
+
+  // İndirim: kullanıcının yazdığı rakam yurtdışında da dönüştürülmez, aynen düşülür.
+  if (hasDiscount) sum -= appliedDiscount;
+
+  // Kargo/Shipping (opsiyonel, yalnızca girildiyse): kullanıcının isteği üzerine
+  // VAT tabanına DAHİL EDİLMEZ — yalnızca en son, VAT hesaplandıktan sonra TOPLAM'a eklenir
+  // (bkz. recalc/renderResult/buildMessage). Bu yüzden burada sum'a eklenmez.
+  return sum;
+}
+
+// VAT (Güncelleme 29): yalnızca Yurtdışı Modunda ve toggle açıkken uygulanır.
+// Subtotal her zaman displayAmount() ile önceden yuvarlanmış satırların toplamı olduğu için
+// (her biri 20'nin katı), VAT = Subtotal × %15 her zaman tam sayı çıkar.
+function computeVat(intlSubtotal){
+  return Math.round(intlSubtotal * 0.15);
+}
+
+/* =========================================================
    7. YARDIMCI FONKSİYONLAR
    ========================================================= */
 
@@ -778,8 +889,8 @@ function priceLabel(p){
   }
   if (p.id === 'harfMagnet'){
     return locale === 'intl'
-      ? `first 6 letters ${money(100)} each, then ${money(70)} each`
-      : 'ilk 6 harf 100 TL, sonrası 70 TL';
+      ? `first 5 letters ${money(100)} each, then ${money(70)} each`
+      : 'ilk 5 harf 100 TL, sonrası 70 TL';
   }
   return money(p.price);
 }
@@ -885,28 +996,51 @@ function renderResult(result){
     if (state.ciftIsim) html += `<div class="result-line"><span>${state.ciftIsim} × ${pname('ciftIsim')}</span><span>${money(ciftIsimCost)}</span></div>`;
   }
 
+  if (hasDiscount){
+    html += `<div class="result-line head">${tr('resultHeadDiscount')}</div>`;
+    html += `<div class="result-line"><span>${discountDesc}</span><span>-${rawMoney(appliedDiscount)}</span></div>`;
+  }
+
   if (extraServices.length){
     html += `<div class="result-line head">${tr('resultHeadExtra')}</div>`;
     extraServices.forEach(x => {
-      html += `<div class="result-line"><span>${x.desc}</span><span>${money(Number(x.price))}</span></div>`;
+      html += `<div class="result-line"><span>${x.desc}</span><span>${rawMoney(Number(x.price))}</span></div>`;
     });
   }
 
-  if (hasDiscount){
-    html += `<div class="result-line head">${tr('resultHeadDiscount')}</div>`;
-    html += `<div class="result-line"><span>${discountDesc}</span><span>-${money(appliedDiscount)}</span></div>`;
+  if (locale === 'intl'){
+    const shippingVal = Number(state.intlShipping) || 0;
+    if (shippingVal > 0){
+      html += `<div class="result-line head">${tr('resultHeadShipping')}</div>`;
+      html += `<div class="result-line"><span>${tr('resultHeadShipping')}</span><span>${rawMoney(shippingVal)}</span></div>`;
+    }
   }
 
   html += `<div class="dashed"></div>`;
-  html += `<div class="result-line sub"><span>${tr('subtotalLabel')}</span><span>${money(araToplam)}</span></div>`;
 
-  // Yuvarlama farkı: iki dönüştürülmüş değerin farkı olarak gösterilir (küçük TL farkının
-  // dönüşüm formülüyle orantısız büyümesini önlemek için).
-  const araDisp = locale === 'intl' ? convertToIntl(araToplam) : araToplam;
-  const finalDisp = locale === 'intl' ? convertToIntl(finalToplam) : finalToplam;
-  const diff = finalDisp - araDisp;
-  if (diff !== 0) html += `<div class="result-line sub"><span>${tr('roundingLabel')}</span><span>${diff > 0 ? '+' : ''}${fmt(diff)} ${tr('currency')}</span></div>`;
-  html += `<div class="grand"><span>${tr('totalLine')}</span><span>${money(finalToplam)}</span></div>`;
+  if (locale === 'intl'){
+    // Güncelleme 28 düzeltmesi: Subtotal, ekranda gösterilen (zaten yuvarlanmış) satırların
+    // TOPLAMIDIR — TL toplamının yeniden çevrilmesi DEĞİL. Bu yüzden burada money(araToplam)
+    // yerine computeIntlSubtotal(result) kullanılır.
+    // Kargo, VAT tabanına DAHİL EDİLMEZ — yalnızca VAT hesaplandıktan sonra TOPLAM'a eklenir.
+    const intlSubtotal = computeIntlSubtotal(result);
+    const shippingVal = Number(state.intlShipping) || 0;
+    html += `<div class="result-line sub"><span>${tr('subtotalLabel')}</span><span>${fmtDisplay(intlSubtotal)}</span></div>`;
+
+    let subtotalWithVat = intlSubtotal;
+    if (vatEnabled){
+      const vat = computeVat(intlSubtotal);
+      subtotalWithVat = intlSubtotal + vat;
+      html += `<div class="result-line sub"><span>${tr('vatLine')}</span><span>${fmtDisplay(vat)}</span></div>`;
+    }
+    html += `<div class="grand"><span>${tr('totalLine')}</span><span>${fmtDisplay(subtotalWithVat + shippingVal)}</span></div>`;
+  } else {
+    // Türkiye modu tamamen değişmeden devam eder (Güncelleme 31/35).
+    html += `<div class="result-line sub"><span>${tr('subtotalLabel')}</span><span>${money(araToplam)}</span></div>`;
+    const diff = finalToplam - araToplam;
+    if (diff !== 0) html += `<div class="result-line sub"><span>${tr('roundingLabel')}</span><span>${diff > 0 ? '+' : ''}${fmt(diff)} ${tr('currency')}</span></div>`;
+    html += `<div class="grand"><span>${tr('totalLine')}</span><span>${money(finalToplam)}</span></div>`;
+  }
 
   box.innerHTML = html;
 }
@@ -976,67 +1110,56 @@ function buildProductLines(result){
   if (state.harfMagnet) lines.push(`• ${state.harfMagnet} × ${pname('harfMagnet')} — ${money(harfMagnetCost(state.harfMagnet))}`);
   if (state.ciftIsim)   lines.push(`• ${state.ciftIsim} × ${pname('ciftIsim')} — ${money(ciftIsimCost)}`);
 
-  // Ek Hizmet / Ek Ücret (Güncelleme 23): ürünler arasında, kullanıcının girdiği açıklama ile.
-  extraServices.forEach(x => {
-    lines.push(`• ${x.desc} — ${money(Number(x.price))}`);
-  });
-
-  // İndirim (Güncelleme 22): "İndirim (Açıklama) — -XXX TL" biçiminde, negatif işaretle.
+  // Ek Hizmet / Ek Ücret (Güncelleme 23): indirimden sonra gösterilir (Güncelleme 34).
+  // İndirim (Güncelleme 22): "İndirim (Açıklama) — -XXX TL" biçiminde, ürünlerden hemen sonra (Güncelleme 34).
   if (hasDiscount){
-    lines.push(`• ${tr('resultHeadDiscount')} (${discountDesc}) — -${money(appliedDiscount)}`);
+    lines.push(`• ${tr('resultHeadDiscount')} (${discountDesc}) — -${rawMoney(appliedDiscount)}`);
   }
+  extraServices.forEach(x => {
+    lines.push(`• ${x.desc} — ${rawMoney(Number(x.price))}`);
+  });
 
   return lines;
 }
 
 function buildMessage(result){
-  const { kargoDahilToplam, finalToplam } = result;
+  const { finalToplam } = result;
   const productLines = buildProductLines(result);
   const lines = [];
 
+  // Ürünler (setler, tarak seti, birleştirilmiş/tekil ürünler, indirim, ek hizmet — bu sıradadır).
+  lines.push(...productLines);
+
   if (locale === 'tr'){
-    lines.push('🌸 Siparişiniz');
-    lines.push('');
-    lines.push(...productLines);
+    // Güncelleme 32: sade yapı — yalnızca ürünler, kargo (son satır) ve toplam.
+    lines.push(`• 📦 Kargo — ${money(SABIT_MESAJ.kargo)}`);
     lines.push('');
     lines.push('━━━━━━━━━━━━━━');
     lines.push('');
-    lines.push(`📦 Kargo: ${money(SABIT_MESAJ.kargo)}`);
-    lines.push('');
-    lines.push(`💰 Kargo Dahil Toplam Tutar: ${money(kargoDahilToplam)}`);
-    lines.push('');
-    lines.push(`⏳ Hazırlık Süresi: ${SABIT_MESAJ.hazirlik}`);
-
-    // Şartlı bilgi satırı: sepette en az 1 Çift İsim ürünü varsa gösterilir.
-    if (state.ciftIsim > 0){
-      lines.push('');
-      lines.push(`🩷 ${SABIT_MESAJ.ciftIsimNotu}`);
-    }
-
-    lines.push('');
-    lines.push('Teşekkür ederiz. 🤍');
+    lines.push(`🌸 Toplam Tutar: ${money(finalToplam + SABIT_MESAJ.kargo)}`);
   } else {
-    // Yurtdışı mesajı (Güncelleme 27): kargo tutarı gösterilmez (ülkeye göre değişir),
-    // "Kargo Dahil Toplam Tutar" yerine yalnızca "Products Total" (kargosuz) kullanılır.
-    lines.push('Hello! 🩷');
-    lines.push('');
-    lines.push('Thank you for your order.');
-    lines.push('');
-    lines.push(...productLines);
+    // Güncelleme 33: sade yapı — Shipping son ürün satırı, ardından Subtotal/(VAT)/TOTAL.
+    // Güncelleme 28 düzeltmesi: Subtotal, satır bazlı (zaten yuvarlanmış) tutarların toplamıdır.
+    const shippingVal = Number(state.intlShipping) || 0;
+    if (shippingVal > 0){
+      lines.push(`• 📦 Shipping — ${rawMoney(shippingVal)}`);
+    } else {
+      lines.push(`• 📦 Shipping — Calculated Separately`);
+    }
     lines.push('');
     lines.push('━━━━━━━━━━━━━━');
     lines.push('');
-    lines.push('📦 Shipping: Calculated separately');
-    lines.push('');
-    lines.push(`💰 Products Total: ${money(finalToplam)}`);
-    lines.push('');
-    lines.push('⏳ Production Time: Up to 15 business days (usually faster)');
-    lines.push('');
-    lines.push('📦 Shipping cost depends on destination country, shipping option and package size.');
-    lines.push('Standard box size:');
-    lines.push('40 × 30 × 15 cm');
-    lines.push('');
-    lines.push('Thank you. 🤍');
+
+    const intlSubtotal = computeIntlSubtotal(result);
+
+    if (vatEnabled){
+      const vat = computeVat(intlSubtotal);
+      lines.push(`${tr('subtotalLabel')}: ${fmtDisplay(intlSubtotal)}`);
+      lines.push(`${tr('vatLine')}: ${fmtDisplay(vat)}`);
+      lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + vat + shippingVal)}`);
+    } else {
+      lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + shippingVal)}`);
+    }
   }
 
   // Art arda gelen boş satırları (örn. bir set içeriğinin hemen ardından ayraç geldiğinde) tek satıra indirger.
@@ -1064,7 +1187,20 @@ function showToast(text){
 
 function recalc(){
   const result = optimizeAll(state);
-  document.getElementById('totalAmount').innerHTML = money(result.finalToplam).replace(
+
+  let displayTotal;
+  if (locale === 'intl'){
+    // Güncelleme 28 düzeltmesi: aynı satır-bazlı toplam mantığı burada da kullanılır.
+    // Kargo, VAT tabanına dahil edilmez — VAT hesaplandıktan SONRA toplama eklenir.
+    const intlSubtotal = computeIntlSubtotal(result);
+    const subtotalWithVat = vatEnabled ? intlSubtotal + computeVat(intlSubtotal) : intlSubtotal;
+    const shippingVal = Number(state.intlShipping) || 0;
+    displayTotal = subtotalWithVat + shippingVal;
+  } else {
+    displayTotal = result.finalToplam; // Türkiye modu değişmeden devam eder
+  }
+
+  document.getElementById('totalAmount').innerHTML = fmtDisplay(displayTotal).replace(
     new RegExp(`${tr('currency')}$`), `<span>${tr('currency')}</span>`
   );
   renderResult(result);
@@ -1128,8 +1264,10 @@ document.getElementById('btnClear').addEventListener('click', () => {
   state.discountDesc = '';
   state.discountAmount = 0;
   state.extraServices = [];
+  state.intlShipping = '';
   document.getElementById('discountDesc').value = '';
   document.getElementById('discountAmount').value = '';
+  document.getElementById('intlShippingCost').value = '';
   renderProducts();
   renderExtraServices();
   recalc();
@@ -1219,6 +1357,17 @@ function applyStaticTexts(){
   document.getElementById('btnCopy').textContent = tr('btnCopy');
   document.getElementById('btnPrint').textContent = tr('btnPrint');
   document.getElementById('btnClear').textContent = tr('btnClear');
+  document.getElementById('txtVatLabel').textContent = tr('vatLabel');
+
+  // KDV toggle'ı yalnızca Yurtdışı Modunda görünür (Güncelleme 29, 35). TR moduna dönüldüğünde
+  // gizlenir; VAT hiçbir zaman Türkiye modunda hesaplamayı etkilemez (bkz. renderResult/buildMessage).
+  document.getElementById('vatCard').style.display = (locale === 'intl') ? 'flex' : 'none';
+
+  // Kargo/Shipping alanı da yalnızca Yurtdışı Modunda görünür.
+  document.getElementById('shippingCard').style.display = (locale === 'intl') ? 'block' : 'none';
+  document.getElementById('txtShippingTitle').textContent = tr('shippingTitle');
+  document.getElementById('intlShippingCost').placeholder = tr('shippingPlaceholder');
+
   renderExtraServices();
 }
 
@@ -1228,6 +1377,17 @@ document.getElementById('swLocale').addEventListener('click', function(){
   document.documentElement.lang = locale === 'intl' ? 'en' : 'tr';
   applyStaticTexts();
   renderProducts();
+  recalc();
+});
+
+document.getElementById('swVat').addEventListener('click', function(){
+  vatEnabled = !vatEnabled;
+  this.classList.toggle('on', vatEnabled);
+  recalc();
+});
+
+document.getElementById('intlShippingCost').addEventListener('input', (e) => {
+  state.intlShipping = e.target.value;
   recalc();
 });
 
