@@ -419,8 +419,8 @@ const PRODUCTS = [
   { id: 'tavsan',        name: 'Tavşan Uyku Arkadaşı', nameEN: 'Bunny Sleep Buddy',                 price: PRICES.tavsan },
   { id: 'yaka',          name: 'İsme Özel Boyunluk',    nameEN: 'Personalized Neck Scarf',           price: PRICES.yaka },
   { id: 'ciftYaka',      name: 'Çift Kat İsme Özel Boyunluk', nameEN: 'Double-Layer Personalized Neck Scarf', price: PRICES.ciftYaka },
-  { id: 'kucukSapka',    name: 'Küçük Şapka',          nameEN: 'Toy Hat',                           price: null }, // özel blok sistemi
-  { id: 'buyukSapka',    name: 'Büyük Şapka',          nameEN: 'Personalized Baby Hat',             price: PRICES.buyukSapka },
+  { id: 'kucukSapka',    name: 'Sayılı Şapka',         nameEN: 'Milestone Hat',                     price: null }, // özel blok sistemi
+  { id: 'buyukSapka',    name: 'İsimli Şapka',         nameEN: 'Personalized Hat',                  price: PRICES.buyukSapka },
   { id: 'teddy',         name: 'Teddy Uyku Arkadaşı',  nameEN: 'Teddy Sleep Buddy',                 price: PRICES.teddy },
   { id: 'keciKiliTarak', name: 'Keçi Kılı Tarak',      nameEN: 'Goat Hair Brush',                   price: PRICES.keciKiliTarak },
   { id: 'bambuTarak',    name: 'Bambu Tarak',          nameEN: 'Bamboo Brush',                      price: PRICES.bambuTarak },
@@ -453,16 +453,16 @@ const CONTENT_DISPLAY_NAMES = {
   teddy: 'Teddy Uyku Arkadaşı',
   yaka: 'İsme Özel Boyunluk',
   ciftYaka: 'Çift Kat İsme Özel Boyunluk',
-  buyukSapka: 'İsimli Bebek Şapkası',
-  kucukSapka: 'Oyuncak Şapkası'
+  buyukSapka: 'İsimli Şapka',
+  kucukSapka: 'Sayılı Şapka'
 };
 const CONTENT_DISPLAY_NAMES_EN = {
   tavsan: 'Bunny Sleep Buddy',
   teddy: 'Teddy Sleep Buddy',
   yaka: 'Personalized Neck Scarf',
   ciftYaka: 'Double-Layer Personalized Neck Scarf',
-  buyukSapka: 'Personalized Baby Hat',
-  kucukSapka: 'Toy Hat'
+  buyukSapka: 'Personalized Hat',
+  kucukSapka: 'Milestone Hat'
 };
 
 // Tarak Seti için de aynı içerik gösterimi (otomatik oluşturulan setler dahil)
@@ -479,7 +479,7 @@ const TARAK_CONTENT_DISPLAY_NAMES_EN = {
 // Tarak otomatik seti (kullanıcı bunu seçmez, sistem kendisi oluşturur)
 const TARAK_SET = { name: "2'li Tarak Seti", nameEN: 'Brush Set', price: 1400, requires: { keciKiliTarak: 1, bambuTarak: 1 } };
 
-// Küçük Şapka blok içi birim fiyatlar (1..12. şapka sırasıyla)
+// Sayılı Şapka blok içi birim fiyatlar (1..12. şapka sırasıyla)
 // 1-6: 150 TL sabit / 7-11: 60 TL sabit / 12: 50 TL
 const HAT_UNIT_PRICES = [150,150,150,150,150,150, 60,60,60,60,60, 50];
 const HAT_BLOCK_SIZE = 12;
@@ -1060,11 +1060,16 @@ function buildProductLines(result){
   const pouchWord = locale === 'intl' ? 'Pouch' : 'Kese';
 
   // Bir setin/otomatik setin içeriğini "   • 2 Ürün Adı" biçiminde, aralarında boş satırlarla ekler.
+  // İngilizce'de adet 1'den fazlaysa isim basitçe çoğullanır (örn. "12 Milestone Hats").
   function pushContentLines(order, displayNames, requires, count){
     lines.push('');
     order.forEach(key => {
       const qty = (requires[key] || 0) * count;
-      if (qty > 0) lines.push(`   • ${qty} ${displayNames[key]}`);
+      if (qty > 0){
+        let itemName = displayNames[key];
+        if (locale === 'intl' && qty !== 1 && !itemName.endsWith('s')) itemName += 's';
+        lines.push(`   • ${qty} ${itemName}`);
+      }
     });
     lines.push('');
   }
@@ -1141,10 +1146,18 @@ function buildMessage(result){
     // Güncelleme 33: sade yapı — Shipping son ürün satırı, ardından Subtotal/(VAT)/TOTAL.
     // Güncelleme 28 düzeltmesi: Subtotal, satır bazlı (zaten yuvarlanmış) tutarların toplamıdır.
     const shippingVal = Number(state.intlShipping) || 0;
-    if (shippingVal > 0){
-      lines.push(`• 📦 Shipping — ${rawMoney(shippingVal)}`);
-    } else {
-      lines.push(`• 📦 Shipping — Calculated Separately`);
+
+    // Yeni kural: Yurtdışı + VAT açık + kargo tutarı girilmişse, kargo satırı ürün listesinde
+    // DEĞİL, VAT ile TOTAL arasında gösterilir. Diğer tüm durumlarda (VAT kapalı, veya kargo
+    // boş/"Calculated Separately") davranış eskisi gibi kalır.
+    const showShippingBetweenVatAndTotal = vatEnabled && shippingVal > 0;
+
+    if (!showShippingBetweenVatAndTotal){
+      if (shippingVal > 0){
+        lines.push(`• 📦 Shipping — ${rawMoney(shippingVal)}`);
+      } else {
+        lines.push(`• 📦 Shipping — Calculated Separately`);
+      }
     }
     lines.push('');
     lines.push('━━━━━━━━━━━━━━');
@@ -1156,6 +1169,9 @@ function buildMessage(result){
       const vat = computeVat(intlSubtotal);
       lines.push(`${tr('subtotalLabel')}: ${fmtDisplay(intlSubtotal)}`);
       lines.push(`${tr('vatLine')}: ${fmtDisplay(vat)}`);
+      if (showShippingBetweenVatAndTotal){
+        lines.push(`📦 Shipping: ${rawMoney(shippingVal)}`);
+      }
       lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + vat + shippingVal)}`);
     } else {
       lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + shippingVal)}`);
