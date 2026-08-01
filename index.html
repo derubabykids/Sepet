@@ -344,6 +344,7 @@
     <div class="quick-card-title" id="txtQuickCard3">🪮 Tarak Setleri</div>
     <div class="quick-btn-row">
       <button class="quick-btn" id="qsTarakSeti">➕ Tarak Seti</button>
+      <button class="quick-btn" id="qsTarak2Kese">🩷 2 Keseli Tarak Seti</button>
     </div>
   </div>
 
@@ -501,6 +502,7 @@ state.discountDesc = '';
 state.discountAmount = 0;
 state.extraServices = []; // [{ desc, price }]
 state.intlShipping = ''; // yalnızca yurtdışı modunda kullanılır (Kargo/Shipping tutarı, opsiyonel)
+state.tarakForcedSeparate = 0; // "🩷 2 Keseli Tarak Seti" butonuyla eklenen, eşleştirme dışı tutulan çift sayısı
 
 let locale = 'tr'; // 'tr' | 'intl'
 let vatEnabled = false; // yalnızca locale === 'intl' iken anlamlıdır (Güncelleme 29, 35)
@@ -522,6 +524,7 @@ const I18N = {
     quickBtnTeddyYasSeti: '➕ Teddy Yaş / 6 Aylık Set',
     quickBtnTeddyAylikSet: '➕ Teddy 12 Aylık Set',
     quickBtnTarakSeti: '➕ Tarak Seti',
+    quickBtnTarak2Kese: '🩷 2 Keseli Tarak Seti',
     urunlerTitle: 'Ürünler',
     indirimTitle: '🏷️ İndirim',
     discountDescPlaceholder: 'Açıklama (örn. Kampanya)',
@@ -565,6 +568,7 @@ const I18N = {
     quickBtnTeddyYasSeti: '➕ Teddy 1st Birthday / 6-Month Set',
     quickBtnTeddyAylikSet: '➕ Teddy 12-Month Keepsake Set',
     quickBtnTarakSeti: '➕ Brush Set',
+    quickBtnTarak2Kese: '🩷 2-Pouch Brush Set',
     urunlerTitle: 'Products',
     indirimTitle: '🏷️ Discount',
     discountDescPlaceholder: 'Description (e.g. Promotion)',
@@ -698,10 +702,20 @@ function harfMagnetBreakdown(n){
 // Mümkün olan en fazla sayıda "2'li Tarak Seti" oluşturur (her set 1 keçi kılı + 1 bambu tarak).
 // Bir set her zaman iki ürünü ayrı ayrı almaktan daha ucuzdur (1400 < 720+840), bu yüzden
 // maksimum eşleştirme her zaman minimum fiyatı verir.
-function optimizeTarakSeti(keciKiliAdet, bambuAdet){
-  const setSayisi = Math.min(keciKiliAdet, bambuAdet);
-  const kalanKeci = keciKiliAdet - setSayisi;
-  const kalanBambu = bambuAdet - setSayisi;
+//
+// forcedSeparate (Güncelleme 40): "🩷 2 Keseli Tarak Seti" hızlı ekleme butonuyla eklenen
+// adet sayısıdır. Bu kadar keçi kılı + bambu tarak çifti KASITLI OLARAK eşleştirmenin dışında
+// tutulur (rezerve edilir) ve her zaman kendi normal fiyatlarıyla (720 + 840) ayrı satırlar
+// olarak hesaplanır — 1400 TL'lik indirimli set fiyatı bu adetlere asla uygulanmaz. Kullanıcının
+// +/- ile elle eklediği ek adetler ise her zaman olduğu gibi normal şekilde eşleştirilmeye devam eder.
+function optimizeTarakSeti(keciKiliAdet, bambuAdet, forcedSeparate){
+  const reserved = Math.min(Math.max(forcedSeparate || 0, 0), keciKiliAdet, bambuAdet);
+  const pairableKeci = keciKiliAdet - reserved;
+  const pairableBambu = bambuAdet - reserved;
+
+  const setSayisi = Math.min(pairableKeci, pairableBambu);
+  const kalanKeci = (pairableKeci - setSayisi) + reserved;
+  const kalanBambu = (pairableBambu - setSayisi) + reserved;
   const cost = (setSayisi * TARAK_SET.price)
              + (kalanKeci * PRICES.keciKiliTarak)
              + (kalanBambu * PRICES.bambuTarak);
@@ -770,7 +784,7 @@ function optimizeAnaSetler(inventory){
 
 function optimizeAll(s){
   const anaSetSonuc = optimizeAnaSetler(s);
-  const tarakSonuc = optimizeTarakSeti(s.keciKiliTarak || 0, s.bambuTarak || 0);
+  const tarakSonuc = optimizeTarakSeti(s.keciKiliTarak || 0, s.bambuTarak || 0, s.tarakForcedSeparate || 0);
   const kapiSusuCost = (s.kapiSusu || 0) * PRICES.kapiSusu;
   const harfMagnetTotal = harfMagnetCost(s.harfMagnet || 0);
   const ciftIsimCost = (s.ciftIsim || 0) * PRICES.ciftIsim;
@@ -1258,7 +1272,11 @@ const QUICK_SETS = {
   aylikSet:      { tavsan: 1, yaka: 1, buyukSapka: 1, kucukSapka: 12 },
   teddyYasSeti:  { teddy: 1, ciftYaka: 1, kucukSapka: 1, buyukSapka: 1 },
   teddyAylikSet: { teddy: 1, ciftYaka: 1, buyukSapka: 1, kucukSapka: 12 },
-  tarakSeti:     { keciKiliTarak: 1, bambuTarak: 1 }
+  tarakSeti:     { keciKiliTarak: 1, bambuTarak: 1 },
+  // Güncelleme 40: bu ikisi de sepete eklenir AMA tarakForcedSeparate +1 sayesinde
+  // optimizeTarakSeti bu çifti asla 2'li Tarak Seti'ne (1400 TL) dönüştürmez — her zaman
+  // kendi normal fiyatlarıyla (720 + 840 = 1560 TL) ayrı satırlar olarak kalır.
+  tarak2Kese:    { keciKiliTarak: 1, bambuTarak: 1, tarakForcedSeparate: 1 }
 };
 
 function addQuickSet(items){
@@ -1274,6 +1292,7 @@ document.getElementById('qsAylikSet').addEventListener('click', () => addQuickSe
 document.getElementById('qsTeddyYasSeti').addEventListener('click', () => addQuickSet(QUICK_SETS.teddyYasSeti));
 document.getElementById('qsTeddyAylikSet').addEventListener('click', () => addQuickSet(QUICK_SETS.teddyAylikSet));
 document.getElementById('qsTarakSeti').addEventListener('click', () => addQuickSet(QUICK_SETS.tarakSeti));
+document.getElementById('qsTarak2Kese').addEventListener('click', () => addQuickSet(QUICK_SETS.tarak2Kese));
 
 document.getElementById('btnClear').addEventListener('click', () => {
   PRODUCTS.forEach(p => state[p.id] = 0);
@@ -1281,6 +1300,7 @@ document.getElementById('btnClear').addEventListener('click', () => {
   state.discountAmount = 0;
   state.extraServices = [];
   state.intlShipping = '';
+  state.tarakForcedSeparate = 0;
   document.getElementById('discountDesc').value = '';
   document.getElementById('discountAmount').value = '';
   document.getElementById('intlShippingCost').value = '';
@@ -1362,6 +1382,7 @@ function applyStaticTexts(){
   document.getElementById('qsTeddyYasSeti').textContent = tr('quickBtnTeddyYasSeti');
   document.getElementById('qsTeddyAylikSet').textContent = tr('quickBtnTeddyAylikSet');
   document.getElementById('qsTarakSeti').textContent = tr('quickBtnTarakSeti');
+  document.getElementById('qsTarak2Kese').textContent = tr('quickBtnTarak2Kese');
   document.getElementById('txtUrunlerTitle').textContent = tr('urunlerTitle');
   document.getElementById('txtIndirimTitle').textContent = tr('indirimTitle');
   document.getElementById('discountDesc').placeholder = tr('discountDescPlaceholder');
