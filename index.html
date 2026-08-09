@@ -209,6 +209,20 @@
     font-size:15px;
     font-weight:700;
   }
+  .vat-note{
+    margin-top:10px;
+    font-size:12px;
+    line-height:1.5;
+    color:var(--muted);
+  }
+  .vat-note.loading{color:var(--muted);}
+  .vat-note.error{color:#b3492f;}
+  .vat-note a{
+    color:var(--rose-deep);
+    font-weight:700;
+    text-decoration:underline;
+    cursor:pointer;
+  }
   .switch{
     position:relative;width:50px;height:29px;
     background:var(--line);border-radius:20px;
@@ -314,9 +328,12 @@
     <div class="switch" id="swLocale"><div class="knob"></div></div>
   </div>
 
-  <div class="card locale-card no-print" id="vatCard" style="display:none;">
-    <div class="locale-label" id="txtVatLabel">Include VAT (15%)</div>
-    <div class="switch" id="swVat"><div class="knob"></div></div>
+  <div class="card no-print" id="vatCard" style="display:none;">
+    <div class="locale-card">
+      <div class="locale-label" id="txtVatLabel">Include VAT (15%)</div>
+      <div class="switch" id="swVat"><div class="knob"></div></div>
+    </div>
+    <div id="vatStatusNote" class="vat-note" style="display:none;"></div>
   </div>
 
   <div class="total-card">
@@ -427,6 +444,7 @@ const PRODUCTS = [
   { id: 'bambuTarak',    name: 'Bambu Tarak',          nameEN: 'Bamboo Brush',                      price: PRICES.bambuTarak },
   { id: 'kapiSusu',      name: 'Kapı / Duvar Süsü',    nameEN: 'Door / Wall Decor',                 price: PRICES.kapiSusu },
   { id: 'harfMagnet',    name: 'Harf Magnet',          nameEN: 'Letter Magnets',                    price: null }, // özel kademeli fiyat sistemi
+  { id: 'bubbleHarf',    name: 'Büyük Bubble Harf',    nameEN: 'Large Bubble Letter',                price: null }, // özel kademeli fiyat sistemi (Harf Magnet'ten bağımsız)
   { id: 'ciftIsim',      name: 'Çift İsim',            nameEN: 'Long Double Name',                  price: PRICES.ciftIsim }
 ];
 
@@ -551,7 +569,10 @@ const I18N = {
     toastCopied: 'Kopyalandı',
     toastCopyFail: 'Kopyalama başarısız',
     vatLabel: 'KDV Dahil Et (%15)',
-    vatLine: 'KDV (%15)',
+    vatLine: 'KDV',
+    vatRateLoading: 'Güncel kur alınıyor…',
+    vatRateError: '⚠️ Güncel USD/TRY kuru alınamadı, bu yüzden KDV şu an hesaplanamıyor.',
+    vatRetry: 'Yeniden dene',
     shippingTitle: '📦 Shipping',
     shippingPlaceholder: 'Biliyorsanız kargo tutarını yazın (boş = Calculated Separately)',
     resultHeadShipping: 'Shipping'
@@ -595,7 +616,10 @@ const I18N = {
     toastCopied: 'Copied',
     toastCopyFail: 'Copy failed',
     vatLabel: 'Include VAT (15%)',
-    vatLine: 'VAT (15%)',
+    vatLine: 'VAT',
+    vatRateLoading: 'Fetching current exchange rate…',
+    vatRateError: '⚠️ Could not fetch the current USD/TRY rate, so VAT cannot be calculated right now.',
+    vatRetry: 'Retry',
     shippingTitle: '📦 Shipping',
     shippingPlaceholder: 'Enter shipping cost if known (leave empty = Calculated Separately)',
     resultHeadShipping: 'Shipping'
@@ -695,6 +719,22 @@ function harfMagnetBreakdown(n){
   return { first, extra, firstCost: first * 100, extraCost: extra * 70 };
 }
 
+// Büyük Bubble Harf: Harf Magnet'ten TAMAMEN BAĞIMSIZ, kendi kademeli fiyat sistemi (Güncelleme 41).
+// İlk 5 adet 300 TL/adet, 6. adetten itibaren 210 TL/adet. Set optimizasyonuna dahil değildir,
+// Harf Magnet ile birleştirilmez — tek başına, sabit bir fiyatlandırma kuralı olarak çalışır.
+function bubbleHarfCost(n){
+  if (n <= 0) return 0;
+  if (n <= 5) return n * 300;
+  return (5 * 300) + ((n - 5) * 210);
+}
+
+// Ekranda gösterim için: kaç adet ilk kademede (300 TL), kaç adet ikinci kademede (210 TL)
+function bubbleHarfBreakdown(n){
+  const first = Math.min(n, 5);
+  const extra = Math.max(n - 5, 0);
+  return { first, extra, firstCost: first * 300, extraCost: extra * 210 };
+}
+
 /* =========================================================
    4. TARAK OTOMATİK SET OLUŞTURMA
    ========================================================= */
@@ -787,13 +827,14 @@ function optimizeAll(s){
   const tarakSonuc = optimizeTarakSeti(s.keciKiliTarak || 0, s.bambuTarak || 0, s.tarakForcedSeparate || 0);
   const kapiSusuCost = (s.kapiSusu || 0) * PRICES.kapiSusu;
   const harfMagnetTotal = harfMagnetCost(s.harfMagnet || 0);
+  const bubbleHarfTotal = bubbleHarfCost(s.bubbleHarf || 0);
   const ciftIsimCost = (s.ciftIsim || 0) * PRICES.ciftIsim;
 
   // Ek Hizmet / Ek Ücret (Güncelleme 23): kullanıcının serbestçe eklediği kalemlerin toplamı.
   const extraServices = (s.extraServices || []).filter(x => x.desc && Number(x.price) > 0);
   const extraServicesTotal = extraServices.reduce((sum, x) => sum + Number(x.price), 0);
 
-  const rawTotal = anaSetSonuc.cost + tarakSonuc.cost + kapiSusuCost + harfMagnetTotal + ciftIsimCost + extraServicesTotal;
+  const rawTotal = anaSetSonuc.cost + tarakSonuc.cost + kapiSusuCost + harfMagnetTotal + bubbleHarfTotal + ciftIsimCost + extraServicesTotal;
 
   // İndirim (Güncelleme 22): toplamdan düşülür, negatif toplam oluşmasına izin verilmez.
   const requestedDiscount = Math.max(0, Number(s.discountAmount) || 0);
@@ -810,6 +851,7 @@ function optimizeAll(s){
     tarakSonuc,
     kapiSusuCost,
     harfMagnetCost: harfMagnetTotal,
+    bubbleHarfCost: bubbleHarfTotal,
     ciftIsimCost,
     extraServices,
     extraServicesTotal,
@@ -868,6 +910,7 @@ function computeIntlSubtotal(result){
   if (tarakSonuc.kalanBambu) sum += displayAmount(tarakSonuc.kalanBambu * PRICES.bambuTarak);
   if (state.kapiSusu)   sum += displayAmount(state.kapiSusu * PRICES.kapiSusu);
   if (state.harfMagnet) sum += displayAmount(harfMagnetCost(state.harfMagnet));
+  if (state.bubbleHarf) sum += displayAmount(bubbleHarfCost(state.bubbleHarf));
   if (state.ciftIsim)   sum += displayAmount(ciftIsimCost);
 
   // Ek Hizmet / Ek Ücret: kullanıcının yazdığı rakam yurtdışında da dönüştürülmez, aynen kullanılır.
@@ -882,18 +925,77 @@ function computeIntlSubtotal(result){
   return sum;
 }
 
-// VAT (Güncelleme 29): yalnızca Yurtdışı Modunda ve toggle açıkken uygulanır.
-// Subtotal her zaman displayAmount() ile önceden yuvarlanmış satırların toplamı olduğu için
-// (her biri 20'nin katı), VAT = Subtotal × %15 her zaman tam sayı çıkar.
-function computeVat(intlSubtotal){
-  return Math.round(intlSubtotal * 0.15);
+// VAT formülü (Güncelleme 47, 49, 55):
+// VAT = ((Ürün Toplamı + Kargo) × %15) + (4.50 USD'nin GÜNCEL TL karşılığı)
+// - Ürün Toplamı: computeIntlSubtotal() (kargo hariç, zaten satır bazlı doğru yuvarlanmış toplam)
+// - Kargo: kullanıcının girdiği ham tutar (dönüştürülmez)
+// - 4.50 USD kısmı yalnızca canlı kur başarıyla alındıysa hesaplanır; alınamadıysa VAT
+//   hesaplanamaz (ok:false) ve arayüzde uyarı gösterilir — asla sabit/eski bir kur kullanılmaz.
+// - Güncelleme 56: %15 + 4.50 USD toplandıktan SONRA, nihai VAT tutarı küsuratlıysa yukarı
+//   doğru bir sonraki TAM TL'ye yuvarlanır (matematiksel yuvarlama değil, her zaman yukarı).
+//   Bu yuvarlama yalnızca VAT'ın kendisine uygulanır; Ürün Toplamı/Kargo hesabı etkilenmez.
+const USD_FEE = 4.50;
+
+function computeVat(intlSubtotal, shippingVal){
+  if (rateStatus !== 'ok' || !usdTryRate) return { amount: 0, ok: false };
+  const vatBase = intlSubtotal + (shippingVal || 0);
+  const percentPart = vatBase * 0.15;
+  const usdFeeTRY = USD_FEE * usdTryRate;
+  const rawVat = percentPart + usdFeeTRY;
+  const roundedVat = Math.ceil(rawVat); // her zaman yukarı, bir sonraki tam TL'ye
+  return { amount: roundedVat, ok: true };
+}
+
+/* =========================================================
+   6c. USD/TRY GÜNCEL KUR (Güncelleme 48)
+   ========================================================= */
+
+// Sabit/manuel kur KULLANILMAZ. Kur yalnızca Yurtdışı Modu + VAT açıkken, ihtiyaç anında
+// internetten çekilir ve oturum boyunca önbelleğe alınır. Alınamazsa kullanıcıya net bir
+// uyarı gösterilir; eski/tahmini bir değere asla düşülmez.
+let usdTryRate = null;
+let rateStatus = 'idle'; // 'idle' | 'loading' | 'ok' | 'error'
+
+async function fetchUsdTryRate(){
+  if (rateStatus === 'loading') return;
+  rateStatus = 'loading';
+  recalc();
+
+  const sources = [
+    { url: 'https://open.er-api.com/v6/latest/USD', parse: d => d && d.rates && d.rates.TRY },
+    { url: 'https://api.frankfurter.app/latest?from=USD&to=TRY', parse: d => d && d.rates && d.rates.TRY }
+  ];
+
+  for (const src of sources){
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(src.url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const rate = src.parse(data);
+      if (typeof rate === 'number' && rate > 0){
+        usdTryRate = rate;
+        rateStatus = 'ok';
+        recalc();
+        return;
+      }
+    } catch (e) {
+      // bu kaynak başarısız oldu, sıradaki kaynağı dene
+    }
+  }
+
+  usdTryRate = null;
+  rateStatus = 'error';
+  recalc();
 }
 
 /* =========================================================
    7. YARDIMCI FONKSİYONLAR
    ========================================================= */
 
-function fmt(n){ return n.toLocaleString('tr-TR'); }
+function fmt(n){ return n.toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
 
 function priceLabel(p){
   if (p.id === 'kucukSapka'){
@@ -905,6 +1007,11 @@ function priceLabel(p){
     return locale === 'intl'
       ? `first 5 letters ${money(100)} each, then ${money(70)} each`
       : 'ilk 5 harf 100 TL, sonrası 70 TL';
+  }
+  if (p.id === 'bubbleHarf'){
+    return locale === 'intl'
+      ? `first 5 pcs ${money(300)} each, then ${money(210)} each`
+      : 'ilk 5 adet 300 TL, sonrası 210 TL';
   }
   return money(p.price);
 }
@@ -948,7 +1055,7 @@ function renderProducts(){
 
 function renderResult(result){
   const box = document.getElementById('resultBox');
-  const { anaSetSonuc, tarakSonuc, kapiSusuCost, harfMagnetCost, ciftIsimCost,
+  const { anaSetSonuc, tarakSonuc, kapiSusuCost, harfMagnetCost, bubbleHarfCost, ciftIsimCost,
           extraServices, extraServicesTotal, hasDiscount, discountDesc, appliedDiscount,
           araToplam, finalToplam } = result;
 
@@ -959,7 +1066,7 @@ function renderResult(result){
   const rem = anaSetSonuc.remaining;
   const hasIndividual = (rem.tavsan || rem.yaka || rem.ciftYaka || rem.teddy || rem.buyukSapka || rem.kucukSapka
                        || tarakSonuc.kalanKeci || tarakSonuc.kalanBambu
-                       || state.kapiSusu || state.harfMagnet || state.ciftIsim);
+                       || state.kapiSusu || state.harfMagnet || state.bubbleHarf || state.ciftIsim);
 
   let html = '';
 
@@ -1007,6 +1114,13 @@ function renderResult(result){
       if (hb.extra) html += `<div class="result-line sub"><span>${hb.extra}</span><span>${money(hb.extraCost)}</span></div>`;
     }
 
+    if (state.bubbleHarf){
+      const bb = bubbleHarfBreakdown(state.bubbleHarf);
+      html += `<div class="result-line"><span>${state.bubbleHarf} × ${pname('bubbleHarf')}</span><span>${money(bubbleHarfCost)}</span></div>`;
+      if (bb.first) html += `<div class="result-line sub"><span>${bb.first}</span><span>${money(bb.firstCost)}</span></div>`;
+      if (bb.extra) html += `<div class="result-line sub"><span>${bb.extra}</span><span>${money(bb.extraCost)}</span></div>`;
+    }
+
     if (state.ciftIsim) html += `<div class="result-line"><span>${state.ciftIsim} × ${pname('ciftIsim')}</span><span>${money(ciftIsimCost)}</span></div>`;
   }
 
@@ -1036,18 +1150,22 @@ function renderResult(result){
     // Güncelleme 28 düzeltmesi: Subtotal, ekranda gösterilen (zaten yuvarlanmış) satırların
     // TOPLAMIDIR — TL toplamının yeniden çevrilmesi DEĞİL. Bu yüzden burada money(araToplam)
     // yerine computeIntlSubtotal(result) kullanılır.
-    // Kargo, VAT tabanına DAHİL EDİLMEZ — yalnızca VAT hesaplandıktan sonra TOPLAM'a eklenir.
     const intlSubtotal = computeIntlSubtotal(result);
     const shippingVal = Number(state.intlShipping) || 0;
     html += `<div class="result-line sub"><span>${tr('subtotalLabel')}</span><span>${fmtDisplay(intlSubtotal)}</span></div>`;
 
-    let subtotalWithVat = intlSubtotal;
+    let total = intlSubtotal + shippingVal;
     if (vatEnabled){
-      const vat = computeVat(intlSubtotal);
-      subtotalWithVat = intlSubtotal + vat;
-      html += `<div class="result-line sub"><span>${tr('vatLine')}</span><span>${fmtDisplay(vat)}</span></div>`;
+      // Güncelleme 47: VAT = ((Ürün Toplamı + Kargo) × %15) + güncel kurdan 4.50 USD.
+      const vat = computeVat(intlSubtotal, shippingVal);
+      if (vat.ok){
+        html += `<div class="result-line sub"><span>${tr('vatLine')}</span><span>${fmtDisplay(vat.amount)}</span></div>`;
+        total += vat.amount;
+      }
+      // vat.ok false ise (kur alınamadıysa) VAT satırı gösterilmez; toplam VAT'sız kalır.
+      // Kullanıcıya durum, VAT toggle'ının altındaki uyarı notuyla ayrıca bildirilir.
     }
-    html += `<div class="grand"><span>${tr('totalLine')}</span><span>${fmtDisplay(subtotalWithVat + shippingVal)}</span></div>`;
+    html += `<div class="grand"><span>${tr('totalLine')}</span><span>${fmtDisplay(total)}</span></div>`;
   } else {
     // Türkiye modu tamamen değişmeden devam eder (Güncelleme 31/35).
     html += `<div class="result-line sub"><span>${tr('subtotalLabel')}</span><span>${money(araToplam)}</span></div>`;
@@ -1127,6 +1245,7 @@ function buildProductLines(result){
   if (tarakSonuc.kalanBambu) lines.push(`• ${tarakSonuc.kalanBambu} × ${pname('bambuTarak')} + ${pouchWord} — ${money(tarakSonuc.kalanBambu * PRICES.bambuTarak)}`);
   if (state.kapiSusu)   lines.push(`• ${state.kapiSusu} × ${pname('kapiSusu')} — ${money(state.kapiSusu * PRICES.kapiSusu)}`);
   if (state.harfMagnet) lines.push(`• ${state.harfMagnet} × ${pname('harfMagnet')} — ${money(harfMagnetCost(state.harfMagnet))}`);
+  if (state.bubbleHarf) lines.push(`• ${state.bubbleHarf} × ${pname('bubbleHarf')} — ${money(bubbleHarfCost(state.bubbleHarf))}`);
   if (state.ciftIsim)   lines.push(`• ${state.ciftIsim} × ${pname('ciftIsim')} — ${money(ciftIsimCost)}`);
 
   // Ek Hizmet / Ek Ücret (Güncelleme 23): indirimden sonra gösterilir (Güncelleme 34).
@@ -1157,36 +1276,34 @@ function buildMessage(result){
     lines.push('');
     lines.push(`🌸 Toplam Tutar: ${money(finalToplam + SABIT_MESAJ.kargo)}`);
   } else {
-    // Güncelleme 33: sade yapı — Shipping son ürün satırı, ardından Subtotal/(VAT)/TOTAL.
+    // Güncelleme 51/53: Shipping her zaman ürünlerin son satırıdır (VAT açık/kapalı farketmez).
     // Güncelleme 28 düzeltmesi: Subtotal, satır bazlı (zaten yuvarlanmış) tutarların toplamıdır.
     const shippingVal = Number(state.intlShipping) || 0;
 
-    // Yeni kural: Yurtdışı + VAT açık + kargo tutarı girilmişse, kargo satırı ürün listesinde
-    // DEĞİL, VAT ile TOTAL arasında gösterilir. Diğer tüm durumlarda (VAT kapalı, veya kargo
-    // boş/"Calculated Separately") davranış eskisi gibi kalır.
-    const showShippingBetweenVatAndTotal = vatEnabled && shippingVal > 0;
-
-    if (!showShippingBetweenVatAndTotal){
-      if (shippingVal > 0){
-        lines.push(`• 📦 Shipping — ${rawMoney(shippingVal)}`);
-      } else {
-        lines.push(`• 📦 Shipping — Calculated Separately`);
-      }
+    if (shippingVal > 0){
+      lines.push(`• 📦 Shipping — ${rawMoney(shippingVal)}`);
+    } else {
+      lines.push(`• 📦 Shipping — Calculated Separately`);
     }
     lines.push('');
     lines.push('━━━━━━━━━━━━━━');
     lines.push('');
 
     const intlSubtotal = computeIntlSubtotal(result);
+    lines.push(`${tr('subtotalLabel')}: ${fmtDisplay(intlSubtotal)}`);
 
     if (vatEnabled){
-      const vat = computeVat(intlSubtotal);
-      lines.push(`${tr('subtotalLabel')}: ${fmtDisplay(intlSubtotal)}`);
-      lines.push(`${tr('vatLine')}: ${fmtDisplay(vat)}`);
-      if (showShippingBetweenVatAndTotal){
-        lines.push(`📦 Shipping: ${rawMoney(shippingVal)}`);
+      // Güncelleme 47/49: VAT = ((Ürün Toplamı + Kargo) × %15) + güncel kurdan 4.50 USD.
+      // Güncelleme 50: müşteriye yalnızca "VAT: XXXX TRY" gösterilir, formül/kur asla gösterilmez.
+      const vat = computeVat(intlSubtotal, shippingVal);
+      if (vat.ok){
+        lines.push(`${tr('vatLine')}: ${fmtDisplay(vat.amount)}`);
+        lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + shippingVal + vat.amount)}`);
+      } else {
+        // Güncel kur alınamadı: VAT satırı gösterilmez, toplam VAT'sız hesaplanır.
+        // Arayüzde (Price Breakdown üstünde) ayrıca uyarı gösterilir.
+        lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + shippingVal)}`);
       }
-      lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + vat + shippingVal)}`);
     } else {
       lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + shippingVal)}`);
     }
@@ -1220,12 +1337,19 @@ function recalc(){
 
   let displayTotal;
   if (locale === 'intl'){
+    // VAT açıksa ve kur henüz hiç denenmediyse arka planda çekmeyi başlat (Güncelleme 48).
+    if (vatEnabled && rateStatus === 'idle') fetchUsdTryRate();
+
     // Güncelleme 28 düzeltmesi: aynı satır-bazlı toplam mantığı burada da kullanılır.
-    // Kargo, VAT tabanına dahil edilmez — VAT hesaplandıktan SONRA toplama eklenir.
     const intlSubtotal = computeIntlSubtotal(result);
-    const subtotalWithVat = vatEnabled ? intlSubtotal + computeVat(intlSubtotal) : intlSubtotal;
     const shippingVal = Number(state.intlShipping) || 0;
-    displayTotal = subtotalWithVat + shippingVal;
+
+    if (vatEnabled){
+      const vat = computeVat(intlSubtotal, shippingVal);
+      displayTotal = intlSubtotal + shippingVal + (vat.ok ? vat.amount : 0);
+    } else {
+      displayTotal = intlSubtotal + shippingVal;
+    }
   } else {
     displayTotal = result.finalToplam; // Türkiye modu değişmeden devam eder
   }
@@ -1235,6 +1359,7 @@ function recalc(){
   );
   renderResult(result);
   document.getElementById('msgBox').textContent = buildMessage(result);
+  updateVatStatusNote();
 }
 
 /* =========================================================
@@ -1420,8 +1545,32 @@ document.getElementById('swLocale').addEventListener('click', function(){
 document.getElementById('swVat').addEventListener('click', function(){
   vatEnabled = !vatEnabled;
   this.classList.toggle('on', vatEnabled);
+  // VAT açıldıysa ve kur daha önce alınamadıysa (veya hiç denenmediyse) tekrar dene.
+  if (vatEnabled && locale === 'intl' && rateStatus !== 'ok' && rateStatus !== 'loading'){
+    fetchUsdTryRate();
+  }
   recalc();
 });
+
+// VAT toggle'ının altında, kur çekme durumuna göre (yükleniyor / hata / gizli) not gösterir.
+function updateVatStatusNote(){
+  const note = document.getElementById('vatStatusNote');
+  if (locale !== 'intl' || !vatEnabled || rateStatus === 'ok'){
+    note.style.display = 'none';
+    note.innerHTML = '';
+    return;
+  }
+  note.style.display = 'block';
+  if (rateStatus === 'loading'){
+    note.className = 'vat-note loading';
+    note.textContent = tr('vatRateLoading');
+  } else {
+    note.className = 'vat-note error';
+    note.innerHTML = `${tr('vatRateError')} <a id="vatRetryLink">${tr('vatRetry')}</a>`;
+    const retryLink = document.getElementById('vatRetryLink');
+    if (retryLink) retryLink.addEventListener('click', () => fetchUsdTryRate());
+  }
+}
 
 document.getElementById('intlShippingCost').addEventListener('input', (e) => {
   state.intlShipping = e.target.value;
