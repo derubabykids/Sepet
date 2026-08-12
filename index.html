@@ -1306,7 +1306,7 @@ function buildMessage(result){
 
     if (kdvEnabled){
       const kdv = computeKdv(finalToplam, kargo);
-      lines.push(`KDV (%20): ${money(kdv)}`);
+      lines.push(`KDV: ${money(kdv)}`);
       lines.push(`🌸 KDV Dahil Toplam Tutar: ${money(finalToplam + kargo + kdv)}`);
     } else {
       lines.push(`🌸 Toplam Tutar: ${money(finalToplam + kargo)}`);
