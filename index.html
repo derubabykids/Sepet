@@ -336,6 +336,11 @@
     <div id="vatStatusNote" class="vat-note" style="display:none;"></div>
   </div>
 
+  <div class="card locale-card no-print" id="kdvCard" style="display:none;">
+    <div class="locale-label" id="txtKdvLabel">KDV (%20)</div>
+    <div class="switch" id="swKdv"><div class="knob"></div></div>
+  </div>
+
   <div class="total-card">
     <div class="label" id="txtTotalLabel">Toplam Tutar</div>
     <div class="amount" id="totalAmount">0 <span>TL</span></div>
@@ -524,6 +529,7 @@ state.tarakForcedSeparate = 0; // "🩷 2 Keseli Tarak Seti" butonuyla eklenen, 
 
 let locale = 'tr'; // 'tr' | 'intl'
 let vatEnabled = false; // yalnızca locale === 'intl' iken anlamlıdır (Güncelleme 29, 35)
+let kdvEnabled = false; // yalnızca locale === 'tr' iken anlamlıdır (Yurtiçi KDV — VAT'tan bağımsız)
 
 /* =========================================================
    1b. ULUSLARARASI (i18n) METİNLER
@@ -946,6 +952,16 @@ function computeVat(intlSubtotal, shippingVal){
   return { amount: roundedVat, ok: true };
 }
 
+// Yurtiçi KDV (Türkiye modu, VAT'tan tamamen bağımsız):
+// KDV = (Ürün Toplamı + Kargo) × %20 — 4.50 USD ek ücreti YOK, USD/TRY kuru YOK,
+// yurtdışı 0.70/20 TL dönüşüm sistemi hiçbir şekilde karışmaz.
+// Küsurat varsa (VAT ile aynı mantıkla) daima bir üst tam TL'ye yuvarlanır.
+function computeKdv(urunToplami, kargo){
+  const matrah = urunToplami + (kargo || 0);
+  const rawKdv = matrah * 0.20;
+  return Math.ceil(rawKdv);
+}
+
 /* =========================================================
    6c. USD/TRY GÜNCEL KUR (Güncelleme 48)
    ========================================================= */
@@ -1167,11 +1183,22 @@ function renderResult(result){
     }
     html += `<div class="grand"><span>${tr('totalLine')}</span><span>${fmtDisplay(total)}</span></div>`;
   } else {
-    // Türkiye modu tamamen değişmeden devam eder (Güncelleme 31/35).
+    // Türkiye modu: mevcut Ara toplam/Yuvarlama mantığı aynen korunur (Güncelleme 31/35).
+    // Yeni: Kargo artık Price Breakdown'da da gösteriliyor, ve KDV açıksa KDV satırı eklenir.
     html += `<div class="result-line sub"><span>${tr('subtotalLabel')}</span><span>${money(araToplam)}</span></div>`;
     const diff = finalToplam - araToplam;
     if (diff !== 0) html += `<div class="result-line sub"><span>${tr('roundingLabel')}</span><span>${diff > 0 ? '+' : ''}${fmt(diff)} ${tr('currency')}</span></div>`;
-    html += `<div class="grand"><span>${tr('totalLine')}</span><span>${money(finalToplam)}</span></div>`;
+
+    const kargo = SABIT_MESAJ.kargo;
+    html += `<div class="result-line sub"><span>📦 Kargo</span><span>${money(kargo)}</span></div>`;
+
+    if (kdvEnabled){
+      const kdv = computeKdv(finalToplam, kargo);
+      html += `<div class="result-line sub"><span>KDV (%20)</span><span>${money(kdv)}</span></div>`;
+      html += `<div class="grand"><span>KDV Dahil Toplam Tutar</span><span>${money(finalToplam + kargo + kdv)}</span></div>`;
+    } else {
+      html += `<div class="grand"><span>${tr('totalLine')}</span><span>${money(finalToplam + kargo)}</span></div>`;
+    }
   }
 
   box.innerHTML = html;
@@ -1270,11 +1297,20 @@ function buildMessage(result){
 
   if (locale === 'tr'){
     // Güncelleme 32: sade yapı — yalnızca ürünler, kargo (son satır) ve toplam.
-    lines.push(`• 📦 Kargo — ${money(SABIT_MESAJ.kargo)}`);
+    // Yurtiçi KDV güncellemesi: KDV açıksa ayraçtan sonra KDV satırı ve "KDV Dahil Toplam Tutar" eklenir.
+    const kargo = SABIT_MESAJ.kargo;
+    lines.push(`• 📦 Kargo — ${money(kargo)}`);
     lines.push('');
     lines.push('━━━━━━━━━━━━━━');
     lines.push('');
-    lines.push(`🌸 Toplam Tutar: ${money(finalToplam + SABIT_MESAJ.kargo)}`);
+
+    if (kdvEnabled){
+      const kdv = computeKdv(finalToplam, kargo);
+      lines.push(`KDV (%20): ${money(kdv)}`);
+      lines.push(`🌸 KDV Dahil Toplam Tutar: ${money(finalToplam + kargo + kdv)}`);
+    } else {
+      lines.push(`🌸 Toplam Tutar: ${money(finalToplam + kargo)}`);
+    }
   } else {
     // Güncelleme 51/53: Shipping her zaman ürünlerin son satırıdır (VAT açık/kapalı farketmez).
     // Güncelleme 28 düzeltmesi: Subtotal, satır bazlı (zaten yuvarlanmış) tutarların toplamıdır.
@@ -1351,7 +1387,10 @@ function recalc(){
       displayTotal = intlSubtotal + shippingVal;
     }
   } else {
-    displayTotal = result.finalToplam; // Türkiye modu değişmeden devam eder
+    // Türkiye modu: Toplam Tutar artık Ürün Toplamı + Kargo'dur (Yurtiçi KDV güncellemesi),
+    // KDV açıksa üzerine yuvarlanmış KDV de eklenir. Fiyat optimizasyon motoru değişmedi.
+    const kargo = SABIT_MESAJ.kargo;
+    displayTotal = result.finalToplam + kargo + (kdvEnabled ? computeKdv(result.finalToplam, kargo) : 0);
   }
 
   document.getElementById('totalAmount').innerHTML = fmtDisplay(displayTotal).replace(
@@ -1525,6 +1564,9 @@ function applyStaticTexts(){
   // gizlenir; VAT hiçbir zaman Türkiye modunda hesaplamayı etkilemez (bkz. renderResult/buildMessage).
   document.getElementById('vatCard').style.display = (locale === 'intl') ? 'flex' : 'none';
 
+  // KDV toggle'ı (Yurtiçi) yalnızca Türkiye Modunda görünür — VAT kartının tam tersi.
+  document.getElementById('kdvCard').style.display = (locale === 'tr') ? 'flex' : 'none';
+
   // Kargo/Shipping alanı da yalnızca Yurtdışı Modunda görünür.
   document.getElementById('shippingCard').style.display = (locale === 'intl') ? 'block' : 'none';
   document.getElementById('txtShippingTitle').textContent = tr('shippingTitle');
@@ -1549,6 +1591,12 @@ document.getElementById('swVat').addEventListener('click', function(){
   if (vatEnabled && locale === 'intl' && rateStatus !== 'ok' && rateStatus !== 'loading'){
     fetchUsdTryRate();
   }
+  recalc();
+});
+
+document.getElementById('swKdv').addEventListener('click', function(){
+  kdvEnabled = !kdvEnabled;
+  this.classList.toggle('on', kdvEnabled);
   recalc();
 });
 
