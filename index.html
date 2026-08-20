@@ -330,9 +330,20 @@
 
   <div class="card no-print" id="vatCard" style="display:none;">
     <div class="locale-card">
-      <div class="locale-label" id="txtVatLabel">Include VAT (15%)</div>
+      <div class="locale-label" id="txtVatLabel">Include VAT / Taxes</div>
       <div class="switch" id="swVat"><div class="knob"></div></div>
     </div>
+
+    <div id="countrySection" style="display:none; margin-top:14px;">
+      <div class="field-row">
+        <select class="field-input" id="countrySelect"></select>
+      </div>
+      <div id="customVatFields" class="field-row" style="display:none;">
+        <input type="number" class="field-input" id="customVatRate" min="0" step="0.01">
+        <input type="number" class="field-input" id="customVatFee" min="0" step="0.01">
+      </div>
+    </div>
+
     <div id="vatStatusNote" class="vat-note" style="display:none;"></div>
   </div>
 
@@ -526,6 +537,9 @@ state.discountAmount = 0;
 state.extraServices = []; // [{ desc, price }]
 state.intlShipping = ''; // yalnızca yurtdışı modunda kullanılır (Kargo/Shipping tutarı, opsiyonel)
 state.tarakForcedSeparate = 0; // "🩷 2 Keseli Tarak Seti" butonuyla eklenen, eşleştirme dışı tutulan çift sayısı
+state.selectedCountry = 'qatar'; // Yurtdışı VAT için seçili ülke (yalnızca vatEnabled iken kullanılır)
+state.customVatRate = 15; // "Custom" ülke seçiliyken kullanılan yüzde (örn. 15 = %15)
+state.customVatFixedFeeUSD = 4.50; // "Custom" ülke seçiliyken kullanılan sabit ücret (USD)
 
 let locale = 'tr'; // 'tr' | 'intl'
 let vatEnabled = false; // yalnızca locale === 'intl' iken anlamlıdır (Güncelleme 29, 35)
@@ -574,10 +588,15 @@ const I18N = {
     currency: 'TL',
     toastCopied: 'Kopyalandı',
     toastCopyFail: 'Kopyalama başarısız',
-    vatLabel: 'KDV Dahil Et (%15)',
-    vatLine: 'KDV',
+    vatLabel: 'VAT / Vergiyi Dahil Et',
+    vatLine: 'VAT',
+    customsDutyLine: 'Gümrük Vergisi',
+    fixedFeeLine: 'Sabit Ücret',
+    countryLabel: 'Ülke',
+    customVatRatePlaceholder: 'VAT Oranı (%)',
+    customVatFeePlaceholder: 'Sabit Ücret (USD)',
     vatRateLoading: 'Güncel kur alınıyor…',
-    vatRateError: '⚠️ Güncel USD/TRY kuru alınamadı, bu yüzden KDV şu an hesaplanamıyor.',
+    vatRateError: '⚠️ Güncel USD/TRY kuru alınamadı, bu yüzden vergi şu an hesaplanamıyor.',
     vatRetry: 'Yeniden dene',
     shippingTitle: '📦 Shipping',
     shippingPlaceholder: 'Biliyorsanız kargo tutarını yazın (boş = Calculated Separately)',
@@ -621,10 +640,15 @@ const I18N = {
     currency: 'TRY',
     toastCopied: 'Copied',
     toastCopyFail: 'Copy failed',
-    vatLabel: 'Include VAT (15%)',
+    vatLabel: 'Include VAT / Taxes',
     vatLine: 'VAT',
+    customsDutyLine: 'Customs Duty',
+    fixedFeeLine: 'Fixed Fee',
+    countryLabel: 'Country',
+    customVatRatePlaceholder: 'VAT Rate (%)',
+    customVatFeePlaceholder: 'Fixed VAT Fee (USD)',
     vatRateLoading: 'Fetching current exchange rate…',
-    vatRateError: '⚠️ Could not fetch the current USD/TRY rate, so VAT cannot be calculated right now.',
+    vatRateError: '⚠️ Could not fetch the current USD/TRY rate, so tax cannot be calculated right now.',
     vatRetry: 'Retry',
     shippingTitle: '📦 Shipping',
     shippingPlaceholder: 'Enter shipping cost if known (leave empty = Calculated Separately)',
@@ -687,6 +711,11 @@ function tarakContentNames(){
 }
 function tarakSetName(){
   return locale === 'intl' ? TARAK_SET.nameEN : TARAK_SET.name;
+}
+function countryName(key){
+  const rule = COUNTRY_TAX_RULES[key];
+  if (!rule) return key;
+  return locale === 'intl' ? rule.name : rule.nameTR;
 }
 
 /* =========================================================
@@ -931,25 +960,67 @@ function computeIntlSubtotal(result){
   return sum;
 }
 
-// VAT formülü (Güncelleme 47, 49, 55):
-// VAT = ((Ürün Toplamı + Kargo) × %15) + (4.50 USD'nin GÜNCEL TL karşılığı)
-// - Ürün Toplamı: computeIntlSubtotal() (kargo hariç, zaten satır bazlı doğru yuvarlanmış toplam)
-// - Kargo: kullanıcının girdiği ham tutar (dönüştürülmez)
-// - 4.50 USD kısmı yalnızca canlı kur başarıyla alındıysa hesaplanır; alınamadıysa VAT
-//   hesaplanamaz (ok:false) ve arayüzde uyarı gösterilir — asla sabit/eski bir kur kullanılmaz.
-// - Güncelleme 56: %15 + 4.50 USD toplandıktan SONRA, nihai VAT tutarı küsuratlıysa yukarı
-//   doğru bir sonraki TAM TL'ye yuvarlanır (matematiksel yuvarlama değil, her zaman yukarı).
-//   Bu yuvarlama yalnızca VAT'ın kendisine uygulanır; Ürün Toplamı/Kargo hesabı etkilenmez.
-const USD_FEE = 4.50;
+// Ülkeye göre değişen VAT / Gümrük Vergisi / Sabit Ücret kuralları.
+// "Toplam Değer" = Ürün Toplamı (intlSubtotal) + Kargo — eşik kontrolü USD cinsinden yapılır.
+// below: eşiğin ALTINDA uygulanan kurallar / aboveOrEqual: eşik ve ÜZERİNDE uygulanan kurallar.
+const COUNTRY_TAX_RULES = {
+  qatar:   { name: 'Qatar', nameTR: 'Katar', threshold: 272,
+             below: { fixedFeeUSD: 4.50 }, aboveOrEqual: { customsDuty: 0.05 } },
+  ksa:     { name: 'Saudi Arabia (KSA)', nameTR: 'Suudi Arabistan (KSA)', threshold: 266,
+             below: { vat: 0.15, fixedFeeUSD: 4.50 }, aboveOrEqual: { vat: 0.15, customsDuty: 0.05, fixedFeeUSD: 4.50 } },
+  uae:     { name: 'United Arab Emirates (UAE)', nameTR: 'Birleşik Arap Emirlikleri (BAE)', threshold: 272,
+             below: { vat: 0.05 }, aboveOrEqual: { vat: 0.05, customsDuty: 0.05 } },
+  bahrain: { name: 'Bahrain', nameTR: 'Bahreyn', threshold: 770,
+             below: { fixedFeeUSD: 4.50 }, aboveOrEqual: { vat: 0.10, customsDuty: 0.05 } },
+  kuwait:  { name: 'Kuwait', nameTR: 'Kuveyt', threshold: 330,
+             below: { fixedFeeUSD: 4.50 }, aboveOrEqual: { customsDuty: 0.05 } },
+  oman:    { name: 'Oman', nameTR: 'Umman', threshold: 259,
+             below: { vat: 0.05 }, aboveOrEqual: { vat: 0.05, customsDuty: 0.05 } },
+  custom:  { name: 'Custom', nameTR: 'Özel' }
+};
+const COUNTRY_ORDER = ['qatar', 'ksa', 'uae', 'bahrain', 'kuwait', 'oman', 'custom'];
 
-function computeVat(intlSubtotal, shippingVal){
-  if (rateStatus !== 'ok' || !usdTryRate) return { amount: 0, ok: false };
-  const vatBase = intlSubtotal + (shippingVal || 0);
-  const percentPart = vatBase * 0.15;
-  const usdFeeTRY = USD_FEE * usdTryRate;
-  const rawVat = percentPart + usdFeeTRY;
-  const roundedVat = Math.ceil(rawVat); // her zaman yukarı, bir sonraki tam TL'ye
-  return { amount: roundedVat, ok: true };
+// Ülke bazlı vergi motoru (eski sabit %15 VAT sisteminin yerini alır).
+// - Hazır bir ülke seçiliyse: "Toplam Değer" (Ürün+Kargo) USD karşılığı eşikle karşılaştırılır,
+//   ilgili kademenin VAT / Customs Duty / Fixed Fee kuralları uygulanır. Her kalem KENDİ BAŞINA
+//   hesaplanıp yukarı doğru tam TL'ye yuvarlanır ve yalnızca uygulanan kalemler satır olarak döner.
+// - "Custom" seçiliyse: ülke kuralları tamamen devre dışı kalır; kullanıcının girdiği VAT Rate ve
+//   Fixed VAT Fee kullanılır, TEK bir "VAT" satırında birleştirilir (yüzde + sabit ücret birlikte
+//   toplanıp bir kez yuvarlanır) — tıpkı eski basit VAT sisteminde olduğu gibi.
+// - Kur alınamadıysa (rateStatus !== 'ok') hiçbir vergi hesaplanmaz, ok:false döner.
+function computeCountryTax(intlSubtotal, shippingVal){
+  if (rateStatus !== 'ok' || !usdTryRate) return { ok: false, lines: [], total: 0 };
+
+  const totalValueTRY = intlSubtotal + (shippingVal || 0);
+
+  if (state.selectedCountry === 'custom'){
+    const rate = Math.max(0, Number(state.customVatRate) || 0) / 100;
+    const feeUSD = Math.max(0, Number(state.customVatFixedFeeUSD) || 0);
+    if (rate <= 0 && feeUSD <= 0) return { ok: true, lines: [], total: 0 };
+    const raw = (totalValueTRY * rate) + (feeUSD * usdTryRate);
+    const amount = Math.ceil(raw);
+    return { ok: true, lines: [{ key: 'vat', label: tr('vatLine'), amount }], total: amount };
+  }
+
+  const rule = COUNTRY_TAX_RULES[state.selectedCountry];
+  if (!rule || !rule.threshold) return { ok: true, lines: [], total: 0 };
+
+  const totalValueUSD = totalValueTRY / usdTryRate;
+  const tier = totalValueUSD >= rule.threshold ? rule.aboveOrEqual : rule.below;
+
+  const lines = [];
+  if (tier.vat){
+    lines.push({ key: 'vat', label: tr('vatLine'), amount: Math.ceil(totalValueTRY * tier.vat) });
+  }
+  if (tier.fixedFeeUSD){
+    lines.push({ key: 'fixedFee', label: tr('fixedFeeLine'), amount: Math.ceil(tier.fixedFeeUSD * usdTryRate) });
+  }
+  if (tier.customsDuty){
+    lines.push({ key: 'customs', label: tr('customsDutyLine'), amount: Math.ceil(totalValueTRY * tier.customsDuty) });
+  }
+
+  const total = lines.reduce((s, l) => s + l.amount, 0);
+  return { ok: true, lines, total };
 }
 
 // Yurtiçi KDV (Türkiye modu, VAT'tan tamamen bağımsız):
@@ -1172,13 +1243,16 @@ function renderResult(result){
 
     let total = intlSubtotal + shippingVal;
     if (vatEnabled){
-      // Güncelleme 47: VAT = ((Ürün Toplamı + Kargo) × %15) + güncel kurdan 4.50 USD.
-      const vat = computeVat(intlSubtotal, shippingVal);
-      if (vat.ok){
-        html += `<div class="result-line sub"><span>${tr('vatLine')}</span><span>${fmtDisplay(vat.amount)}</span></div>`;
-        total += vat.amount;
+      // Ülke bazlı vergi motoru: seçilen ülkeye/Custom'a göre VAT / Fixed Fee / Customs Duty
+      // kalemlerinden yalnızca uygulanan olanlar, her biri kendi satırında gösterilir.
+      const tax = computeCountryTax(intlSubtotal, shippingVal);
+      if (tax.ok){
+        tax.lines.forEach(l => {
+          html += `<div class="result-line sub"><span>${l.label}</span><span>${fmtDisplay(l.amount)}</span></div>`;
+        });
+        total += tax.total;
       }
-      // vat.ok false ise (kur alınamadıysa) VAT satırı gösterilmez; toplam VAT'sız kalır.
+      // tax.ok false ise (kur alınamadıysa) hiçbir vergi satırı gösterilmez; toplam vergisiz kalır.
       // Kullanıcıya durum, VAT toggle'ının altındaki uyarı notuyla ayrıca bildirilir.
     }
     html += `<div class="grand"><span>${tr('totalLine')}</span><span>${fmtDisplay(total)}</span></div>`;
@@ -1329,14 +1403,15 @@ function buildMessage(result){
     lines.push(`${tr('subtotalLabel')}: ${fmtDisplay(intlSubtotal)}`);
 
     if (vatEnabled){
-      // Güncelleme 47/49: VAT = ((Ürün Toplamı + Kargo) × %15) + güncel kurdan 4.50 USD.
-      // Güncelleme 50: müşteriye yalnızca "VAT: XXXX TRY" gösterilir, formül/kur asla gösterilmez.
-      const vat = computeVat(intlSubtotal, shippingVal);
-      if (vat.ok){
-        lines.push(`${tr('vatLine')}: ${fmtDisplay(vat.amount)}`);
-        lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + shippingVal + vat.amount)}`);
+      // Ülke bazlı vergi motoru: yalnızca uygulanan kalemler (VAT / Fixed Fee / Customs Duty)
+      // kendi adlarıyla ayrı satırlarda gösterilir; formül, eşik değeri ve USD/TRY kuru
+      // müşteriye asla gösterilmez (yalnızca "VAT: XXXX TRY" gibi son tutarlar görünür).
+      const tax = computeCountryTax(intlSubtotal, shippingVal);
+      if (tax.ok && tax.lines.length){
+        tax.lines.forEach(l => lines.push(`${l.label}: ${fmtDisplay(l.amount)}`));
+        lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + shippingVal + tax.total)}`);
       } else {
-        // Güncel kur alınamadı: VAT satırı gösterilmez, toplam VAT'sız hesaplanır.
+        // Kur alınamadı veya uygulanan vergi yok: vergi satırı gösterilmez, toplam vergisiz hesaplanır.
         // Arayüzde (Price Breakdown üstünde) ayrıca uyarı gösterilir.
         lines.push(`🌸 ${tr('totalLine')}: ${fmtDisplay(intlSubtotal + shippingVal)}`);
       }
@@ -1381,8 +1456,8 @@ function recalc(){
     const shippingVal = Number(state.intlShipping) || 0;
 
     if (vatEnabled){
-      const vat = computeVat(intlSubtotal, shippingVal);
-      displayTotal = intlSubtotal + shippingVal + (vat.ok ? vat.amount : 0);
+      const tax = computeCountryTax(intlSubtotal, shippingVal);
+      displayTotal = intlSubtotal + shippingVal + (tax.ok ? tax.total : 0);
     } else {
       displayTotal = intlSubtotal + shippingVal;
     }
@@ -1560,9 +1635,11 @@ function applyStaticTexts(){
   document.getElementById('btnClear').textContent = tr('btnClear');
   document.getElementById('txtVatLabel').textContent = tr('vatLabel');
 
-  // KDV toggle'ı yalnızca Yurtdışı Modunda görünür (Güncelleme 29, 35). TR moduna dönüldüğünde
-  // gizlenir; VAT hiçbir zaman Türkiye modunda hesaplamayı etkilemez (bkz. renderResult/buildMessage).
+  // VAT toggle'ı yalnızca Yurtdışı Modunda görünür. Ülke seçimi bölümü ise yalnızca
+  // Yurtdışı + VAT açıkken görünür (Ülke Bazlı Vergi güncellemesi).
   document.getElementById('vatCard').style.display = (locale === 'intl') ? 'flex' : 'none';
+  document.getElementById('countrySection').style.display = (locale === 'intl' && vatEnabled) ? 'block' : 'none';
+  renderCountrySelect();
 
   // KDV toggle'ı (Yurtiçi) yalnızca Türkiye Modunda görünür — VAT kartının tam tersi.
   document.getElementById('kdvCard').style.display = (locale === 'tr') ? 'flex' : 'none';
@@ -1573,6 +1650,28 @@ function applyStaticTexts(){
   document.getElementById('intlShippingCost').placeholder = tr('shippingPlaceholder');
 
   renderExtraServices();
+}
+
+// Ülke <select> seçeneklerini aktif locale'e göre (bilingual) doldurur ve Custom VAT
+// alanlarının görünürlüğünü/metinlerini günceller. Yalnızca VAT açık ve Yurtdışı modundaysa
+// anlamlıdır, ama her zaman güvenle çağrılabilir (görünmüyorsa etkisizdir).
+function renderCountrySelect(){
+  const sel = document.getElementById('countrySelect');
+  sel.innerHTML = '';
+  COUNTRY_ORDER.forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = countryName(key);
+    sel.appendChild(opt);
+  });
+  sel.value = state.selectedCountry;
+
+  const isCustom = state.selectedCountry === 'custom';
+  document.getElementById('customVatFields').style.display = isCustom ? 'flex' : 'none';
+  document.getElementById('customVatRate').placeholder = tr('customVatRatePlaceholder');
+  document.getElementById('customVatRate').value = state.customVatRate;
+  document.getElementById('customVatFee').placeholder = tr('customVatFeePlaceholder');
+  document.getElementById('customVatFee').value = state.customVatFixedFeeUSD;
 }
 
 document.getElementById('swLocale').addEventListener('click', function(){
@@ -1587,10 +1686,29 @@ document.getElementById('swLocale').addEventListener('click', function(){
 document.getElementById('swVat').addEventListener('click', function(){
   vatEnabled = !vatEnabled;
   this.classList.toggle('on', vatEnabled);
+  document.getElementById('countrySection').style.display = (locale === 'intl' && vatEnabled) ? 'block' : 'none';
+  if (vatEnabled) renderCountrySelect();
   // VAT açıldıysa ve kur daha önce alınamadıysa (veya hiç denenmediyse) tekrar dene.
   if (vatEnabled && locale === 'intl' && rateStatus !== 'ok' && rateStatus !== 'loading'){
     fetchUsdTryRate();
   }
+  recalc();
+});
+
+document.getElementById('countrySelect').addEventListener('change', (e) => {
+  state.selectedCountry = e.target.value;
+  const isCustom = state.selectedCountry === 'custom';
+  document.getElementById('customVatFields').style.display = isCustom ? 'flex' : 'none';
+  recalc();
+});
+
+document.getElementById('customVatRate').addEventListener('input', (e) => {
+  state.customVatRate = e.target.value;
+  recalc();
+});
+
+document.getElementById('customVatFee').addEventListener('input', (e) => {
+  state.customVatFixedFeeUSD = e.target.value;
   recalc();
 });
 
